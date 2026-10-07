@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>סימולטור: הערכת מודלים ו-SVM</title>
+<style>
+/* ===== Shared theme kit for ML-course simulators & interactive labs =====
+   Inline this verbatim inside a <style> block so the file stays self-contained.
+   Matches the upgraded tutorials (indigo/violet, light cards, RTL). Add your own
+   component CSS below it as needed. */
+:root{
+  --primary:#6366f1; --primary-600:#4f46e5; --secondary:#7c3aed; --secondary-600:#6d28d9;
+  --accent:#ec4899; --info:#3b82f6; --success:#16a34a; --success-500:#22c55e;
+  --warning:#ef4444; --amber:#f59e0b; --ink:#263056; --muted:#5a6688;
+  --surface:#fff; --surface-2:#f6f8fd; --surface-3:#eef2fb; --line:#e4e9f5; --line-2:#d7deee;
+  --grad:linear-gradient(135deg,var(--primary),var(--secondary));
+  --grad-soft:linear-gradient(135deg,#eef2ff,#f5edff);
+  --r-sm:8px; --r-md:14px; --r-lg:20px; --r-pill:999px;
+  --sh-sm:0 2px 6px rgba(30,36,64,.07); --sh-md:0 8px 24px rgba(30,36,64,.10); --sh-lg:0 16px 44px rgba(30,36,64,.16);
+  --font:"Segoe UI","Assistant","Heebo","Rubik","Noto Sans Hebrew",Tahoma,Arial,sans-serif;
+  --mono:"JetBrains Mono","Fira Code","Consolas","Courier New",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);color:var(--ink);line-height:1.7;min-height:100vh;
+  background:linear-gradient(135deg,#6366f1 0%,#7c3aed 55%,#9333ea 100%) fixed;-webkit-font-smoothing:antialiased}
+.sim-wrap{max-width:1180px;margin:0 auto;padding:1.6rem}
+header,.sim-header{position:relative;overflow:hidden;background:var(--surface);border-radius:var(--r-lg);
+  padding:1.8rem 2rem;margin-bottom:1.2rem;box-shadow:var(--sh-lg);text-align:center}
+header::before,.sim-header::before{content:"";position:absolute;inset-inline:0;top:0;height:6px;
+  background:linear-gradient(90deg,var(--primary),var(--secondary),var(--accent))}
+h1{font-size:clamp(1.5rem,3.4vw,2.2rem);font-weight:800;letter-spacing:-.01em;line-height:1.2;
+  background:linear-gradient(120deg,var(--primary-600),var(--secondary),var(--accent));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle,header p{color:var(--muted);font-size:1.05rem;margin-top:.4rem}
+h2{color:var(--primary-600);font-size:1.3rem;font-weight:800;margin:.2rem 0 .8rem}
+h3{color:var(--secondary-600);font-size:1.1rem;font-weight:700;margin:.6rem 0 .4rem}
+
+/* tabs */
+.tabs{display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center;background:rgba(255,255,255,.85);
+  backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:var(--r-pill);
+  padding:.5rem;margin-bottom:1.2rem;box-shadow:var(--sh-sm);position:sticky;top:.5rem;z-index:50}
+.tab{padding:.5rem 1.1rem;border-radius:var(--r-pill);cursor:pointer;font-weight:600;font-size:.92rem;
+  color:var(--muted);border:1px solid transparent;background:none;font-family:inherit;transition:all .2s}
+.tab:hover{background:var(--surface-3);color:var(--primary-600)}
+.tab.active{background:var(--grad);color:#fff;box-shadow:var(--sh-sm)}
+.tabpane{display:none;animation:fade .4s ease}
+.tabpane.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* panels / cards */
+.panel,.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:1.4rem;margin-bottom:1.2rem;box-shadow:var(--sh-md)}
+.panel-grid{display:grid;grid-template-columns:320px 1fr;gap:1.2rem;align-items:start}
+@media(max-width:820px){.panel-grid{grid-template-columns:1fr}}
+
+/* controls */
+.controls{display:flex;flex-direction:column;gap:1rem}
+.control label{display:flex;justify-content:space-between;font-weight:600;font-size:.9rem;margin-bottom:.35rem}
+.control label .val{color:var(--secondary-600);font-family:var(--mono);background:var(--surface-3);
+  padding:.05rem .5rem;border-radius:var(--r-pill)}
+input[type=range]{width:100%;height:8px;border-radius:var(--r-pill);background:var(--surface-3);
+  outline:none;-webkit-appearance:none;appearance:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+  background:var(--grad);cursor:pointer;border:2px solid #fff;box-shadow:var(--sh-sm)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--secondary);
+  cursor:pointer;border:2px solid #fff}
+select,input[type=number]{font-family:inherit;padding:.45rem .7rem;border:1px solid var(--line-2);
+  border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font-size:.9rem}
+.btn,.btn2{padding:.6rem 1.2rem;border:none;border-radius:var(--r-pill);font-weight:700;cursor:pointer;
+  font-family:inherit;font-size:.92rem;transition:transform .15s,box-shadow .15s;display:inline-flex;align-items:center;gap:.4rem}
+.btn{background:var(--grad);color:#fff;box-shadow:var(--sh-sm)}
+.btn:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
+.btn2{background:var(--surface);color:var(--primary-600);border:2px solid var(--primary)}
+.btn2:hover{background:var(--primary);color:#fff}
+.btnrow{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
+.seg{display:inline-flex;background:var(--surface-3);border-radius:var(--r-pill);padding:.2rem}
+.seg button{border:none;background:none;padding:.4rem .9rem;border-radius:var(--r-pill);cursor:pointer;
+  font-family:inherit;font-weight:600;font-size:.85rem;color:var(--muted)}
+.seg button.active{background:var(--grad);color:#fff}
+
+/* canvas / viz */
+canvas{max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);
+  box-shadow:var(--sh-sm);display:block}
+.viz{display:flex;flex-direction:column;gap:1rem;align-items:center}
+
+/* stat readouts */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.8rem;margin:.4rem 0}
+.stat{background:var(--grad-soft);border:1px solid var(--line);border-radius:var(--r-md);padding:.8rem;text-align:center}
+.stat .k{font-size:.78rem;color:var(--muted);font-weight:600}
+.stat .v{font-size:1.5rem;font-weight:800;color:var(--secondary-600);font-family:var(--mono)}
+
+/* notes / hints */
+.note,.hint{border-radius:var(--r-md);padding:1rem 1.2rem;margin:.8rem 0;border-inline-start:5px solid var(--info);
+  background:linear-gradient(135deg,#eff6ff,#e0efff)}
+.hint{border-inline-start-color:var(--amber);background:linear-gradient(135deg,#fffbeb,#fef3c7)}
+.note h3,.hint h3{margin-top:0}
+
+/* code / output */
+pre{background:#1e293b;color:#e2e8f0;padding:1.2rem;border-radius:var(--r-md);overflow-x:auto;
+  direction:ltr;text-align:left;font-family:var(--mono);font-size:.86rem;line-height:1.55;border:1px solid #2c3a52}
+code{font-family:var(--mono);background:var(--surface-3);color:#4338ca;padding:.1rem .4rem;border-radius:5px;font-size:.88em}
+.output{background:#0f172a;color:#c7f9cc;font-family:var(--mono);font-size:.82rem;padding:1rem 1.2rem;
+  border-radius:var(--r-md);overflow-x:auto;direction:ltr;text-align:left;white-space:pre;border:1px solid #14532d}
+
+/* tables */
+table{width:100%;border-collapse:collapse;margin:.6rem 0;border-radius:var(--r-md);overflow:hidden;box-shadow:var(--sh-sm)}
+th{background:var(--grad);color:#fff;padding:.6rem;font-weight:700}
+td{padding:.55rem;border-bottom:1px solid var(--line);text-align:center}
+tr:nth-child(even) td{background:var(--surface-2)}
+
+footer{color:#ede9fe;text-align:center;font-size:.85rem;padding:1.2rem;opacity:.9}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+/* ===== component CSS (this simulator) ===== */
+.legend{display:flex;gap:1.1rem;flex-wrap:wrap;justify-content:center;font-size:.85rem;color:var(--muted);margin-top:.4rem}
+.legend span{display:inline-flex;align-items:center;gap:.35rem}
+.chip{width:14px;height:14px;border-radius:4px;display:inline-block;border:1px solid rgba(0,0,0,.08)}
+.cm{display:grid;grid-template-columns:auto 1fr 1fr;gap:6px;max-width:380px;margin:.6rem auto}
+.cm .cell{border-radius:12px;padding:.65rem .4rem;text-align:center;font-weight:700}
+.cm .hd{background:var(--surface-3);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:.78rem;line-height:1.25}
+.cm .tp{background:#dcfce7;color:#166534}
+.cm .tn{background:#dbeafe;color:#1e40af}
+.cm .fp{background:#fee2e2;color:#991b1b}
+.cm .fn{background:#fef3c7;color:#92400e}
+.cm .num{font-size:1.5rem;font-family:var(--mono);display:block}
+.cm .lab{font-size:.72rem;opacity:.85}
+.svm-grid{display:grid;grid-template-columns:1fr 250px;gap:1.2rem;align-items:start}
+@media(max-width:820px){.svm-grid{grid-template-columns:1fr}}
+.rowwrap{display:flex;gap:1.2rem;flex-wrap:wrap;justify-content:center}
+.cv-scroll{overflow-x:auto}
+.mini{font-size:.82rem;color:var(--muted)}
+.pill-tag{display:inline-block;background:var(--surface-3);color:var(--secondary-600);font-family:var(--mono);
+  font-weight:700;padding:.15rem .6rem;border-radius:var(--r-pill);font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="sim-wrap">
+  <header>
+    <h1>סימולטור: הערכת מודלים ו-SVM</h1>
+    <p class="subtitle">שבוע 7 · סף החלטה · מטריצת בלבול · עקומת ROC/PR · אימות-צולב · מכונות וקטורים תומכים</p>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="t1">סף החלטה ומטריצת בלבול</button>
+    <button class="tab" data-tab="t2">עקומת ROC</button>
+    <button class="tab" data-tab="t3">Cross-Validation</button>
+    <button class="tab" data-tab="t4">SVM</button>
+  </nav>
+
+  <!-- ==================== TAB 1 ==================== -->
+  <section class="tabpane active" id="t1">
+    <div class="panel">
+      <h2>סף החלטה ומטריצת בלבול</h2>
+      <p class="mini">שני מדגמים מתפלגים על ציר הציון (score): הדגימות ה<b>חיוביות</b> (סגול) וה<b>שליליות</b> (ורוד). המסווג מנבא "חיובי" אם הציון ≥ הסף. גררו את קו הסף על הגרף כדי לראות איך משתנים TP/FP/TN/FN וכל מדדי הביצוע בזמן אמת.</p>
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control">
+            <label>סף החלטה (threshold) <span class="val" id="t1_thrV">50.0</span></label>
+            <input type="range" id="t1_thr" min="0" max="100" step="0.5" value="50">
+          </div>
+          <div class="control">
+            <label>ממוצע חיוביות μ⁺ <span class="val" id="t1_mpV">62</span></label>
+            <input type="range" id="t1_mp" min="30" max="90" step="1" value="62">
+          </div>
+          <div class="control">
+            <label>ממוצע שליליות μ⁻ <span class="val" id="t1_mnV">40</span></label>
+            <input type="range" id="t1_mn" min="10" max="70" step="1" value="40">
+          </div>
+          <div class="control">
+            <label>פיזור σ (משותף) <span class="val" id="t1_sgV">11</span></label>
+            <input type="range" id="t1_sg" min="4" max="22" step="1" value="11">
+          </div>
+          <div class="control">
+            <label>גודל מדגם לכל מחלקה <span class="val" id="t1_nV">200</span></label>
+            <input type="range" id="t1_n" min="30" max="300" step="10" value="200">
+          </div>
+          <div class="btnrow">
+            <button class="btn2" id="t1_regen">🎲 מדגם חדש</button>
+            <button class="btn2" id="t1_youden">📍 סף אופטימלי</button>
+          </div>
+          <div class="hint" style="margin-top:.2rem">
+            <b>💡 טיפ:</b> ככל שההתפלגויות חופפות יותר (σ גדול / μ קרובים) — קשה יותר להפריד, וכל בחירת סף כרוכה ב-trade-off בין דיוק החיזויים החיוביים (precision) ליכולת "לתפוס" את כל החיוביות (recall).
+          </div>
+        </div>
+        <div class="viz">
+          <canvas id="t1_canvas" width="720" height="380"></canvas>
+          <div class="legend">
+            <span><i class="chip" style="background:#7c3aed"></i> חיוביות (P)</span>
+            <span><i class="chip" style="background:#ec4899"></i> שליליות (N)</span>
+            <span><i class="chip" style="background:#16a34a"></i> קו סף</span>
+          </div>
+
+          <div class="cm">
+            <div class="cell hd"></div>
+            <div class="cell hd">חיזוי: חיובי</div>
+            <div class="cell hd">חיזוי: שלילי</div>
+            <div class="cell hd">בפועל: חיובי</div>
+            <div class="cell tp"><span class="num" id="cm_tp">0</span><span class="lab">TP</span></div>
+            <div class="cell fn"><span class="num" id="cm_fn">0</span><span class="lab">FN</span></div>
+            <div class="cell hd">בפועל: שלילי</div>
+            <div class="cell fp"><span class="num" id="cm_fp">0</span><span class="lab">FP</span></div>
+            <div class="cell tn"><span class="num" id="cm_tn">0</span><span class="lab">TN</span></div>
+          </div>
+
+          <div class="stat-grid" style="width:100%">
+            <div class="stat"><div class="k">Accuracy דיוק</div><div class="v" id="m_acc">–</div></div>
+            <div class="stat"><div class="k">Precision</div><div class="v" id="m_prec">–</div></div>
+            <div class="stat"><div class="k">Recall / TPR</div><div class="v" id="m_rec">–</div></div>
+            <div class="stat"><div class="k">Specificity</div><div class="v" id="m_spec">–</div></div>
+            <div class="stat"><div class="k">F1-score</div><div class="v" id="m_f1">–</div></div>
+          </div>
+          <div class="note" style="width:100%">
+            <b>הגדרות:</b> <code>Precision = TP/(TP+FP)</code> · <code>Recall = TP/(TP+FN)</code> · <code>Specificity = TN/(TN+FP)</code> · <code>F1 = 2·P·R/(P+R)</code>. כאשר המכנה מתאפס — המדד מוגדר כ־0 (מוגן מחלוקה באפס).
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 2 ==================== -->
+  <section class="tabpane" id="t2">
+    <div class="panel">
+      <h2>עקומת ROC ועקומת Precision–Recall</h2>
+      <p class="mini">אותו מדגם מהלשונית הראשונה. עקומת ROC נסרקת על פני <b>כל</b> ערכי הסף האפשריים ומציגה את היחס בין TPR ל-FPR. השטח שמתחת לעקומה (AUC) מסכם את כושר ההפרדה של המסווג במספר יחיד. משמאל מוצגת גם עקומת Precision–Recall עם ה-AP.</p>
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control">
+            <label>סף התפעול הנוכחי <span class="val" id="t2_thrV">50.0</span></label>
+            <input type="range" id="t2_thr" min="0" max="100" step="0.5" value="50">
+          </div>
+          <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+            <div class="stat"><div class="k">AUC (ROC)</div><div class="v" id="m_auc">–</div></div>
+            <div class="stat"><div class="k">AP (PR)</div><div class="v" id="m_ap">–</div></div>
+          </div>
+          <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+            <div class="stat"><div class="k">TPR בנקודה</div><div class="v" id="op_tpr">–</div></div>
+            <div class="stat"><div class="k">FPR בנקודה</div><div class="v" id="op_fpr">–</div></div>
+          </div>
+          <div class="hint">
+            <b>💡 קריאה:</b> אלכסון מקווקו = מסווג אקראי (AUC=0.5). ככל שהעקומה "נדחפת" לפינה השמאלית־עליונה, ה-AUC מתקרב ל-1 (מסווג מושלם). כל נקודה על העקומה = בחירת סף אחרת. גררו את הסף וראו את הנקודה הכתומה נעה על שתי העקומות.
+          </div>
+        </div>
+        <div class="viz">
+          <div class="rowwrap">
+            <div class="viz" style="gap:.4rem">
+              <canvas id="t2_roc" width="360" height="340"></canvas>
+              <div class="mini">ROC · ציר-x: FPR · ציר-y: TPR</div>
+            </div>
+            <div class="viz" style="gap:.4rem">
+              <canvas id="t2_pr" width="360" height="340"></canvas>
+              <div class="mini">PR · ציר-x: Recall · ציר-y: Precision</div>
+            </div>
+          </div>
+          <div class="legend">
+            <span><i class="chip" style="background:#6366f1"></i> העקומה</span>
+            <span><i class="chip" style="background:#f59e0b"></i> נקודת התפעול</span>
+            <span><i class="chip" style="background:#94a3b8"></i> קו ייחוס</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 3 ==================== -->
+  <section class="tabpane" id="t3">
+    <div class="panel">
+      <h2>אימות-צולב k-fold (Cross-Validation)</h2>
+      <p class="mini">הנתונים מחולקים ל-<b>k</b> קפלים (folds) שווים. בכל סבב קפל אחד משמש כ<b>ולידציה</b> (כתום) והשאר ל<b>אימון</b> (סגול). המסווג מאומן על קפלי-האימון ומוערך על קפל־הולידציה — וכך מתקבל אומדן ביצועים יציב יותר (ממוצע ± סטיית-תקן) מאשר חלוקה בודדת.</p>
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control">
+            <label>מספר קפלים k <span class="val" id="t3_kV">5</span></label>
+            <input type="range" id="t3_k" min="2" max="10" step="1" value="5">
+          </div>
+          <div class="control">
+            <label>גודל מערך הנתונים n <span class="val" id="t3_nV">60</span></label>
+            <input type="range" id="t3_n" min="20" max="120" step="4" value="60">
+          </div>
+          <div class="control">
+            <label>קושי (חפיפת מחלקות) σ <span class="val" id="t3_sgV">1.0</span></label>
+            <input type="range" id="t3_sg" min="0.3" max="2.4" step="0.1" value="1.0">
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="t3_play">▶ הרץ אנימציה</button>
+            <button class="btn2" id="t3_regen">🎲 נתונים חדשים</button>
+          </div>
+          <div class="btnrow">
+            <button class="btn2" id="t3_prev">◀ קפל קודם</button>
+            <button class="btn2" id="t3_next">קפל הבא ▶</button>
+          </div>
+          <div class="hint">
+            <b>💡 טיפ:</b> k גדול ⇐ יותר נתוני-אימון בכל סבב ואומדן פחות מוטה, אך יקר חישובית ובעל שונות גבוהה יותר. k=5 ו-k=10 הם ברירות-מחדל נפוצות. שימו לב איך סטיית-התקן בין הקפלים גדלה כשהמחלקות חופפות (σ גדול).
+          </div>
+        </div>
+        <div class="viz">
+          <div class="cv-scroll" style="width:100%">
+            <canvas id="t3_canvas" width="680" height="380"></canvas>
+          </div>
+          <div class="legend">
+            <span><i class="chip" style="background:#7c3aed"></i> אימון (Train)</span>
+            <span><i class="chip" style="background:#f59e0b"></i> ולידציה (Val)</span>
+            <span><i class="chip" style="background:#c7d2fe"></i> קפל לא-פעיל</span>
+          </div>
+          <div class="stat-grid" style="width:100%">
+            <div class="stat"><div class="k">קפל נוכחי</div><div class="v" id="cv_fold">1 / 5</div></div>
+            <div class="stat"><div class="k">דיוק בקפל</div><div class="v" id="cv_score">–</div></div>
+            <div class="stat"><div class="k">ממוצע CV</div><div class="v" id="cv_mean">–</div></div>
+            <div class="stat"><div class="k">סטיית-תקן</div><div class="v" id="cv_std">–</div></div>
+          </div>
+          <div style="width:100%;overflow-x:auto">
+            <table id="cv_table"><thead><tr><th>קפל</th><th>גודל אימון</th><th>גודל ולידציה</th><th>דיוק</th></tr></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== TAB 4 ==================== -->
+  <section class="tabpane" id="t4">
+    <div class="panel">
+      <h2>מכונת וקטורים תומכים (SVM)</h2>
+      <p class="mini">שתי מחלקות במישור. ה-SVM מחפש את גבול-ההחלטה עם ה<b>שוליים (margin)</b> הרחבים ביותר. הפרמטר <b>C</b> קובע את האיזון בין שוליים רחבים לבין ענישת טעויות: C נמוך ⇐ שוליים רחבים וסובלנות לשגיאות; C גבוה ⇐ התאמה קשיחה. גרעין (kernel) לא-לינארי מאפשר גבולות מעוקלים. הווקטורים התומכים מסומנים בטבעת ירוקה.</p>
+      <div class="svm-grid">
+        <div class="viz">
+          <canvas id="t4_canvas" width="480" height="480"></canvas>
+          <div class="legend">
+            <span><i class="chip" style="background:#7c3aed"></i> מחלקה +1</span>
+            <span><i class="chip" style="background:#ec4899"></i> מחלקה −1</span>
+            <span><i class="chip" style="border:2px solid #16a34a;background:transparent"></i> וקטור תומך</span>
+            <span>— גבול · ┄ שוליים</span>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="control">
+            <label>גרעין (kernel)</label>
+            <div class="seg" id="t4_kernel">
+              <button data-k="linear" class="active">לינארי</button>
+              <button data-k="rbf">RBF</button>
+              <button data-k="poly">פולינום</button>
+            </div>
+          </div>
+          <div class="control">
+            <label>מערך נתונים</label>
+            <select id="t4_data">
+              <option value="blobs">שני ענני-נקודות (נפרד)</option>
+              <option value="overlap">חופף (רועש)</option>
+              <option value="circles">מעגלים (טבעת)</option>
+              <option value="xor">XOR</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>עלות C <span class="val" id="t4_cV">1.0</span></label>
+            <input type="range" id="t4_c" min="-1" max="2" step="0.1" value="0">
+          </div>
+          <div class="control" id="t4_gammaWrap">
+            <label>γ (RBF) <span class="val" id="t4_gV">1.0</span></label>
+            <input type="range" id="t4_g" min="0.1" max="4" step="0.1" value="1.0">
+          </div>
+          <div class="control" id="t4_degWrap" style="display:none">
+            <label>דרגת פולינום <span class="val" id="t4_dV">3</span></label>
+            <input type="range" id="t4_d" min="2" max="5" step="1" value="3">
+          </div>
+          <div class="btnrow">
+            <button class="btn2" id="t4_regen">🎲 נתונים חדשים</button>
+          </div>
+          <div class="stat-grid" style="grid-template-columns:1fr 1fr">
+            <div class="stat"><div class="k">וקטורים תומכים</div><div class="v" id="t4_sv">–</div></div>
+            <div class="stat"><div class="k">דיוק אימון</div><div class="v" id="t4_acc">–</div></div>
+            <div class="stat"><div class="k">רוחב שוליים</div><div class="v" id="t4_margin">–</div></div>
+            <div class="stat"><div class="k">מס' נקודות</div><div class="v" id="t4_np">–</div></div>
+          </div>
+          <div class="hint">
+            <b>💡 נסו:</b> בחרו את מערך "מעגלים" עם גרעין לינארי — הגבול הישר ייכשל. עברו ל-RBF וראו איך הגבול מתעקל ועוטף את המחלקה הפנימית. הגדילו את γ ⇐ גבול מתפתל יותר (סיכון ל-overfitting).
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>קורס 6100034 · עקרונות בלמידת מכונה · ד״ר חן גלעדי · SCE אשדוד</footer>
+</div>
+
+<script>
+"use strict";
+(function(){
+  /* ---------- utilities ---------- */
+  function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+  function gauss(rng){var u=0,v=0;while(u===0)u=rng();while(v===0)v=rng();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+  function clamp(x,a,b){return x<a?a:(x>b?b:x);}
+  function pct(x){return isFinite(x)?(x*100).toFixed(1)+'%':'—';}
+  function fx(id){return document.getElementById(id);}
+
+  /* ============================================================
+     SHARED EVALUATION DATA (tab 1 + tab 2)
+     ============================================================ */
+  var EV={scores:[],labels:[],nPos:0,nNeg:0,seed:12345,threshold:50};
+  function genEval(){
+    var mp=+fx('t1_mp').value, mn=+fx('t1_mn').value, sg=+fx('t1_sg').value, n=+fx('t1_n').value;
+    var rng=mulberry32(EV.seed);
+    var scores=[],labels=[];
+    for(var i=0;i<n;i++){scores.push(clamp(mp+gauss(rng)*sg,0,100));labels.push(1);}
+    for(var j=0;j<n;j++){scores.push(clamp(mn+gauss(rng)*sg,0,100));labels.push(0);}
+    EV.scores=scores;EV.labels=labels;EV.nPos=n;EV.nNeg=n;
+  }
+  function confusion(thr){
+    var tp=0,fp=0,tn=0,fn=0;
+    for(var i=0;i<EV.scores.length;i++){
+      var pred=EV.scores[i]>=thr?1:0, y=EV.labels[i];
+      if(y===1){ if(pred===1)tp++; else fn++; }
+      else { if(pred===1)fp++; else tn++; }
+    }
+    return {tp:tp,fp:fp,tn:tn,fn:fn};
+  }
+
+  /* ---------- TAB 1 render ---------- */
+  var c1=fx('t1_canvas'), x1=c1.getContext('2d');
+  var PAD={l:46,r:16,t:18,b:34};
+  function plotW(c){return c.width-PAD.l-PAD.r;}
+  function plotH(c){return c.height-PAD.t-PAD.b;}
+  function sx(v){return PAD.l+(v/100)*plotW(c1);}   // score -> px (domain 0..100)
+  function invx(px){return clamp(((px-PAD.l)/plotW(c1))*100,0,100);}
+
+  function renderTab1(){
+    var thr=EV.threshold;
+    var bins=44, W=plotW(c1), H=plotH(c1);
+    var hp=new Array(bins).fill(0), hn=new Array(bins).fill(0);
+    for(var i=0;i<EV.scores.length;i++){
+      var b=Math.min(bins-1,Math.floor(EV.scores[i]/100*bins));
+      if(EV.labels[i]===1)hp[b]++; else hn[b]++;
+    }
+    var mx=1; for(i=0;i<bins;i++){mx=Math.max(mx,hp[i],hn[i]);}
+    x1.clearRect(0,0,c1.width,c1.height);
+    // predicted-positive band (right of threshold)
+    x1.fillStyle='rgba(99,102,241,.06)';
+    x1.fillRect(sx(thr),PAD.t,sx(100)-sx(thr),H);
+    // baseline
+    x1.strokeStyle='#d7deee';x1.lineWidth=1;
+    x1.beginPath();x1.moveTo(PAD.l,PAD.t+H);x1.lineTo(PAD.l+W,PAD.t+H);x1.stroke();
+    // gridlines x
+    x1.fillStyle='#8894b5';x1.font='11px monospace';x1.textAlign='center';
+    for(var g=0;g<=100;g+=20){var gx=sx(g);
+      x1.strokeStyle='rgba(215,222,238,.6)';x1.beginPath();x1.moveTo(gx,PAD.t);x1.lineTo(gx,PAD.t+H);x1.stroke();
+      x1.fillText(g,gx,PAD.t+H+16);}
+    x1.fillText('ציון (score)',PAD.l+W/2,c1.height-4);
+    // bars
+    var bw=W/bins;
+    for(i=0;i<bins;i++){
+      var bx=PAD.l+i*bw;
+      var hnH=(hn[i]/mx)*H, hpH=(hp[i]/mx)*H;
+      x1.fillStyle='rgba(236,72,153,.55)';
+      x1.fillRect(bx+1,PAD.t+H-hnH,bw-2,hnH);
+      x1.fillStyle='rgba(124,58,237,.55)';
+      x1.fillRect(bx+1,PAD.t+H-hpH,bw-2,hpH);
+    }
+    // threshold line
+    var tx=sx(thr);
+    x1.strokeStyle='#16a34a';x1.lineWidth=3;
+    x1.beginPath();x1.moveTo(tx,PAD.t-2);x1.lineTo(tx,PAD.t+H+2);x1.stroke();
+    x1.fillStyle='#16a34a';
+    x1.beginPath();x1.arc(tx,PAD.t+8,7,0,7);x1.fill();
+    x1.fillStyle='#166534';x1.font='bold 11px monospace';x1.textAlign='center';
+    x1.fillText('סף '+thr.toFixed(1),tx,PAD.t-4>10?PAD.t-4:12);
+
+    // metrics
+    var c=confusion(thr);
+    fx('cm_tp').textContent=c.tp; fx('cm_fp').textContent=c.fp;
+    fx('cm_tn').textContent=c.tn; fx('cm_fn').textContent=c.fn;
+    var tot=c.tp+c.fp+c.tn+c.fn;
+    var acc=tot>0?(c.tp+c.tn)/tot:0;
+    var prec=(c.tp+c.fp)>0?c.tp/(c.tp+c.fp):0;
+    var rec=(c.tp+c.fn)>0?c.tp/(c.tp+c.fn):0;
+    var spec=(c.tn+c.fp)>0?c.tn/(c.tn+c.fp):0;
+    var f1=(prec+rec)>0?2*prec*rec/(prec+rec):0;
+    fx('m_acc').textContent=pct(acc);
+    fx('m_prec').textContent=pct(prec);
+    fx('m_rec').textContent=pct(rec);
+    fx('m_spec').textContent=pct(spec);
+    fx('m_f1').textContent=pct(f1);
+  }
+
+  /* ---------- ROC / PR computation ---------- */
+  function computeCurves(){
+    var arr=[];
+    for(var i=0;i<EV.scores.length;i++)arr.push({s:EV.scores[i],y:EV.labels[i]});
+    arr.sort(function(a,b){return b.s-a.s;});
+    var P=EV.nPos,Nn=EV.nNeg;
+    var roc=[{x:0,y:0}], pr=[{x:0,y:1}];
+    var tp=0,fp=0,i=0;
+    while(i<arr.length){
+      var s=arr[i].s;
+      while(i<arr.length && arr[i].s===s){ if(arr[i].y===1)tp++; else fp++; i++; }
+      var tpr=P>0?tp/P:0, fpr=Nn>0?fp/Nn:0;
+      var prec=(tp+fp)>0?tp/(tp+fp):1, rec=P>0?tp/P:0;
+      roc.push({x:fpr,y:tpr});
+      pr.push({x:rec,y:prec});
+    }
+    var auc=0;
+    for(i=1;i<roc.length;i++)auc+=(roc[i].x-roc[i-1].x)*(roc[i].y+roc[i-1].y)/2;
+    var ap=0;
+    for(i=1;i<pr.length;i++)ap+=(pr[i].x-pr[i-1].x)*pr[i].y;
+    return {roc:roc,pr:pr,auc:auc,ap:ap};
+  }
+  function drawCurve(canvas,pts,opts){
+    var ctx=canvas.getContext('2d'), W=canvas.width, H=canvas.height;
+    var p={l:44,r:14,t:14,b:34};
+    var pw=W-p.l-p.r, ph=H-p.t-p.b;
+    function X(v){return p.l+v*pw;} function Y(v){return p.t+(1-v)*ph;}
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='rgba(215,222,238,.7)';ctx.lineWidth=1;ctx.fillStyle='#8894b5';ctx.font='10px monospace';ctx.textAlign='center';
+    for(var g=0;g<=1.001;g+=0.25){
+      ctx.beginPath();ctx.moveTo(X(g),p.t);ctx.lineTo(X(g),p.t+ph);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(p.l,Y(g));ctx.lineTo(p.l+pw,Y(g));ctx.stroke();
+      ctx.fillText(g.toFixed(2),X(g),p.t+ph+14);
+      ctx.textAlign='right';ctx.fillText(g.toFixed(2),p.l-5,Y(g)+3);ctx.textAlign='center';
+    }
+    ctx.fillStyle='#5a6688';ctx.font='11px sans-serif';
+    ctx.fillText(opts.xlab,p.l+pw/2,H-3);
+    ctx.save();ctx.translate(12,p.t+ph/2);ctx.rotate(-Math.PI/2);ctx.fillText(opts.ylab,0,0);ctx.restore();
+    // reference line
+    ctx.strokeStyle='#94a3b8';ctx.setLineDash([5,4]);ctx.lineWidth=1.5;
+    ctx.beginPath();
+    if(opts.ref==='diag'){ctx.moveTo(X(0),Y(0));ctx.lineTo(X(1),Y(1));}
+    else {var base=opts.baseline; ctx.moveTo(X(0),Y(base));ctx.lineTo(X(1),Y(base));}
+    ctx.stroke();ctx.setLineDash([]);
+    // fill under curve
+    ctx.beginPath();ctx.moveTo(X(pts[0].x),Y(0));
+    for(var i=0;i<pts.length;i++)ctx.lineTo(X(pts[i].x),Y(pts[i].y));
+    ctx.lineTo(X(pts[pts.length-1].x),Y(0));ctx.closePath();
+    ctx.fillStyle='rgba(99,102,241,.12)';ctx.fill();
+    // curve
+    ctx.beginPath();ctx.moveTo(X(pts[0].x),Y(pts[0].y));
+    for(i=1;i<pts.length;i++)ctx.lineTo(X(pts[i].x),Y(pts[i].y));
+    ctx.strokeStyle='#6366f1';ctx.lineWidth=2.5;ctx.stroke();
+    // operating point
+    if(opts.op){ctx.fillStyle='#f59e0b';ctx.strokeStyle='#b45309';ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(X(opts.op.x),Y(opts.op.y),6,0,7);ctx.fill();ctx.stroke();}
+  }
+  function renderTab2(){
+    var cv=computeCurves();
+    fx('m_auc').textContent=cv.auc.toFixed(3);
+    fx('m_ap').textContent=cv.ap.toFixed(3);
+    var thr=EV.threshold;
+    var c=confusion(thr);
+    var tpr=EV.nPos>0?c.tp/EV.nPos:0, fpr=EV.nNeg>0?c.fp/EV.nNeg:0;
+    var rec=(c.tp+c.fn)>0?c.tp/(c.tp+c.fn):0, prec=(c.tp+c.fp)>0?c.tp/(c.tp+c.fp):1;
+    fx('op_tpr').textContent=pct(tpr);
+    fx('op_fpr').textContent=pct(fpr);
+    var base=EV.nPos/(EV.nPos+EV.nNeg);
+    drawCurve(fx('t2_roc'),cv.roc,{xlab:'FPR',ylab:'TPR',ref:'diag',op:{x:fpr,y:tpr}});
+    drawCurve(fx('t2_pr'),cv.pr,{xlab:'Recall',ylab:'Precision',ref:'flat',baseline:base,op:{x:rec,y:prec}});
+  }
+
+  function setThreshold(v){
+    EV.threshold=clamp(v,0,100);
+    fx('t1_thr').value=EV.threshold; fx('t1_thrV').textContent=EV.threshold.toFixed(1);
+    fx('t2_thr').value=EV.threshold; fx('t2_thrV').textContent=EV.threshold.toFixed(1);
+    if(activeTab==='t1')renderTab1();
+    if(activeTab==='t2')renderTab2();
+  }
+  function refreshEval(){ genEval(); if(activeTab==='t1')renderTab1(); if(activeTab==='t2')renderTab2(); }
+
+  ['t1_mp','t1_mn','t1_sg','t1_n'].forEach(function(id){
+    fx(id).addEventListener('input',function(){
+      fx(id+'V').textContent=fx(id).value;
+      refreshEval();
+    });
+  });
+  fx('t1_thr').addEventListener('input',function(){setThreshold(+this.value);});
+  fx('t2_thr').addEventListener('input',function(){setThreshold(+this.value);});
+  fx('t1_regen').addEventListener('click',function(){EV.seed=(Math.random()*1e9)|0;refreshEval();});
+  fx('t1_youden').addEventListener('click',function(){
+    var best=-1,bt=50;
+    for(var t=0;t<=100;t+=0.5){var c=confusion(t);
+      var tpr=EV.nPos>0?c.tp/EV.nPos:0, fpr=EV.nNeg>0?c.fp/EV.nNeg:0;
+      var j=tpr-fpr; if(j>best){best=j;bt=t;}}
+    setThreshold(bt);
+  });
+  // drag threshold on canvas
+  var dragging=false;
+  function ptToThr(e){
+    var r=c1.getBoundingClientRect(); var scale=c1.width/r.width;
+    var px=(e.clientX-r.left)*scale; setThreshold(invx(px));
+  }
+  c1.addEventListener('pointerdown',function(e){dragging=true;c1.setPointerCapture(e.pointerId);ptToThr(e);});
+  c1.addEventListener('pointermove',function(e){if(dragging)ptToThr(e);});
+  c1.addEventListener('pointerup',function(){dragging=false;});
+  c1.addEventListener('pointercancel',function(){dragging=false;});
+  c1.style.cursor='ew-resize';
+
+  /* ============================================================
+     TAB 3 — CROSS VALIDATION
+     ============================================================ */
+  var CV={data:[],seed:777,activeFold:0,scores:[],timer:null};
+  function genCV(){
+    var n=+fx('t3_n').value, sg=+fx('t3_sg').value;
+    var rng=mulberry32(CV.seed);
+    var d=[];
+    for(var i=0;i<n;i++){var y=rng()<0.5?1:0; var xv=(y===1?1:-1)+gauss(rng)*sg; d.push({x:xv,y:y});}
+    CV.data=d; CV.activeFold=0;
+    computeCVscores();
+  }
+  function foldRanges(n,k){
+    var base=Math.floor(n/k), rem=n%k, ranges=[], start=0;
+    for(var f=0;f<k;f++){var sz=base+(f<rem?1:0); ranges.push([start,start+sz]); start+=sz;}
+    return ranges;
+  }
+  function computeCVscores(){
+    var n=CV.data.length, k=+fx('t3_k').value;
+    var ranges=foldRanges(n,k);
+    var scores=[];
+    for(var f=0;f<k;f++){
+      var vs=ranges[f][0], ve=ranges[f][1];
+      var s1=0,c1c=0,s0=0,c0c=0;
+      for(var i=0;i<n;i++){ if(i>=vs&&i<ve)continue;
+        if(CV.data[i].y===1){s1+=CV.data[i].x;c1c++;} else {s0+=CV.data[i].x;c0c++;} }
+      var m1=c1c>0?s1/c1c:0.5, m0=c0c>0?s0/c0c:-0.5;
+      var thr=(m1+m0)/2;
+      var correct=0,total=0;
+      for(i=vs;i<ve;i++){ total++; var pred=CV.data[i].x>=thr?1:0; if(pred===CV.data[i].y)correct++; }
+      scores.push({acc:total>0?correct/total:0,train:n-(ve-vs),val:ve-vs});
+    }
+    CV.scores=scores;
+    if(CV.activeFold>=k)CV.activeFold=k-1;
+  }
+  function renderTab3(){
+    var cv=fx('t3_canvas'), ctx=cv.getContext('2d'), W=cv.width, H=cv.height;
+    var n=CV.data.length, k=+fx('t3_k').value;
+    var ranges=foldRanges(n,k);
+    ctx.clearRect(0,0,W,H);
+    var p={l:56,r:52,t:34,b:14};
+    var gw=W-p.l-p.r, gh=H-p.t-p.b;
+    var cellH=gh/k, cellW=gw/n;
+    ctx.fillStyle='#5a6688';ctx.font='12px sans-serif';ctx.textAlign='center';
+    ctx.fillText('דגימות 1…'+n+' →',p.l+gw/2,20);
+    for(var f=0;f<k;f++){
+      var y0=p.t+f*cellH;
+      var isActive=(f===CV.activeFold);
+      var vs=ranges[f][0], ve=ranges[f][1];
+      for(var i=0;i<n;i++){
+        var x0=p.l+i*cellW;
+        var isVal=(i>=vs&&i<ve);
+        if(!isActive){ ctx.fillStyle=isVal?'#fcd9a5':'#c7d2fe'; }
+        else { ctx.fillStyle=isVal?'#f59e0b':'#7c3aed'; }
+        ctx.fillRect(x0+0.5,y0+2,cellW-1,cellH-4);
+      }
+      ctx.fillStyle=isActive?'#6d28d9':'#8894b5';
+      ctx.font=isActive?'bold 12px monospace':'11px monospace';
+      ctx.textAlign='right';
+      ctx.fillText('קפל '+(f+1),p.l-6,y0+cellH/2+4);
+      if(CV.scores[f]){
+        ctx.textAlign='left';ctx.font='11px monospace';
+        ctx.fillStyle=isActive?'#166534':'#94a3b8';
+        ctx.fillText(pct(CV.scores[f].acc),p.l+gw+4,y0+cellH/2+4);
+      }
+    }
+    var accs=CV.scores.map(function(s){return s.acc;});
+    var mean=accs.length?accs.reduce(function(a,b){return a+b;},0)/accs.length:0;
+    var variance=accs.length?accs.reduce(function(a,b){return a+(b-mean)*(b-mean);},0)/accs.length:0;
+    var std=Math.sqrt(variance);
+    fx('cv_fold').textContent=(CV.activeFold+1)+' / '+k;
+    fx('cv_score').textContent=CV.scores[CV.activeFold]?pct(CV.scores[CV.activeFold].acc):'–';
+    fx('cv_mean').textContent=pct(mean);
+    fx('cv_std').textContent='±'+(std*100).toFixed(1);
+    var tb=fx('cv_table').querySelector('tbody'); tb.innerHTML='';
+    for(f=0;f<k;f++){var s=CV.scores[f]; var tr=document.createElement('tr');
+      var hl=(f===CV.activeFold)?' style="font-weight:800;background:#fef3c7"':'';
+      tr.innerHTML='<td'+hl+'>'+(f+1)+'</td><td>'+s.train+'</td><td>'+s.val+'</td><td>'+pct(s.acc)+'</td>';
+      tb.appendChild(tr);
+    }
+  }
+  function stopCVanim(){ if(CV.timer){clearInterval(CV.timer);CV.timer=null;fx('t3_play').textContent='▶ הרץ אנימציה';} }
+  fx('t3_play').addEventListener('click',function(){
+    if(CV.timer){stopCVanim();return;}
+    CV.activeFold=0; renderTab3(); fx('t3_play').textContent='⏸ עצור';
+    CV.timer=setInterval(function(){
+      CV.activeFold++;
+      if(CV.activeFold>=(+fx('t3_k').value)){ stopCVanim(); CV.activeFold=(+fx('t3_k').value)-1; renderTab3(); return; }
+      renderTab3();
+    },850);
+  });
+  fx('t3_next').addEventListener('click',function(){stopCVanim();CV.activeFold=(CV.activeFold+1)%(+fx('t3_k').value);renderTab3();});
+  fx('t3_prev').addEventListener('click',function(){stopCVanim();var k=+fx('t3_k').value;CV.activeFold=(CV.activeFold-1+k)%k;renderTab3();});
+  fx('t3_regen').addEventListener('click',function(){stopCVanim();CV.seed=(Math.random()*1e9)|0;genCV();renderTab3();});
+  fx('t3_k').addEventListener('input',function(){stopCVanim();fx('t3_kV').textContent=this.value;CV.activeFold=0;computeCVscores();renderTab3();});
+  fx('t3_n').addEventListener('input',function(){stopCVanim();fx('t3_nV').textContent=this.value;genCV();renderTab3();});
+  fx('t3_sg').addEventListener('input',function(){stopCVanim();fx('t3_sgV').textContent=(+this.value).toFixed(1);genCV();renderTab3();});
+
+  /* ============================================================
+     TAB 4 — SVM (simplified SMO, kernelized)
+     ============================================================ */
+  var SVM={X:[],Y:[],alpha:[],b:0,seed:2024,R:60};
+  function kType(){return document.querySelector('#t4_kernel .active').getAttribute('data-k');}
+  function genSVMdata(){
+    var type=fx('t4_data').value;
+    var rng=mulberry32(SVM.seed);
+    var X=[],Y=[]; var nper=22;
+    function push(px,py,cls){X.push([px,py]);Y.push(cls);}
+    if(type==='blobs'){
+      for(var i=0;i<nper;i++){push(1.2+gauss(rng)*0.55,1.2+gauss(rng)*0.55,1);push(-1.2+gauss(rng)*0.55,-1.2+gauss(rng)*0.55,-1);}
+    } else if(type==='overlap'){
+      for(i=0;i<nper;i++){push(0.9+gauss(rng)*0.95,0.9+gauss(rng)*0.95,1);push(-0.9+gauss(rng)*0.95,-0.9+gauss(rng)*0.95,-1);}
+    } else if(type==='circles'){
+      for(i=0;i<nper;i++){var a=rng()*6.283; var r1=rng()*0.7; push(Math.cos(a)*r1,Math.sin(a)*r1,1);
+        var a2=rng()*6.283; var r2=1.8+rng()*0.5; push(Math.cos(a2)*r2,Math.sin(a2)*r2,-1);}
+    } else { // xor
+      for(i=0;i<nper;i++){
+        if(i%2===0){push(1.2+gauss(rng)*0.4,1.2+gauss(rng)*0.4,1);push(-1.2+gauss(rng)*0.4,-1.2+gauss(rng)*0.4,1);}
+        else{push(1.2+gauss(rng)*0.4,-1.2+gauss(rng)*0.4,-1);push(-1.2+gauss(rng)*0.4,1.2+gauss(rng)*0.4,-1);}
+      }
+    }
+    SVM.X=X;SVM.Y=Y;
+  }
+  function kernel(a,b){
+    var type=kType();
+    var dot=a[0]*b[0]+a[1]*b[1];
+    if(type==='linear')return dot;
+    if(type==='rbf'){var g=+fx('t4_g').value; var dx=a[0]-b[0],dy=a[1]-b[1]; return Math.exp(-g*(dx*dx+dy*dy));}
+    var d=+fx('t4_d').value; return Math.pow(dot+1,d);
+  }
+  function trainSVM(){
+    var X=SVM.X, Y=SVM.Y, N=X.length;
+    var C=Math.pow(10,+fx('t4_c').value);
+    var K=[]; for(var i=0;i<N;i++){K[i]=new Array(N); for(var j=0;j<N;j++)K[i][j]=kernel(X[i],X[j]);}
+    var alpha=new Array(N).fill(0), b=0;
+    var tol=1e-3, passes=0, maxPasses=5, iters=0, maxIters=8000;
+    var rng=mulberry32(97);
+    function f(idx){var s=b; for(var t=0;t<N;t++){ if(alpha[t]>0)s+=alpha[t]*Y[t]*K[t][idx]; } return s;}
+    while(passes<maxPasses && iters<maxIters){
+      var changed=0;
+      for(i=0;i<N;i++){
+        iters++;
+        var Ei=f(i)-Y[i];
+        if((Y[i]*Ei<-tol && alpha[i]<C)||(Y[i]*Ei>tol && alpha[i]>0)){
+          var jj=Math.floor(rng()*N); if(jj===i)jj=(jj+1)%N;
+          var Ej=f(jj)-Y[jj];
+          var ai=alpha[i], aj=alpha[jj];
+          var L,Hh;
+          if(Y[i]!==Y[jj]){L=Math.max(0,aj-ai);Hh=Math.min(C,C+aj-ai);}
+          else{L=Math.max(0,ai+aj-C);Hh=Math.min(C,ai+aj);}
+          if(L>=Hh)continue;
+          var eta=2*K[i][jj]-K[i][i]-K[jj][jj];
+          if(eta>=0)continue;
+          var ajNew=aj-Y[jj]*(Ei-Ej)/eta;
+          ajNew=clamp(ajNew,L,Hh);
+          if(Math.abs(ajNew-aj)<1e-6)continue;
+          var aiNew=ai+Y[i]*Y[jj]*(aj-ajNew);
+          var b1=b-Ei-Y[i]*(aiNew-ai)*K[i][i]-Y[jj]*(ajNew-aj)*K[i][jj];
+          var b2=b-Ej-Y[i]*(aiNew-ai)*K[i][jj]-Y[jj]*(ajNew-aj)*K[jj][jj];
+          if(aiNew>0&&aiNew<C)b=b1; else if(ajNew>0&&ajNew<C)b=b2; else b=(b1+b2)/2;
+          alpha[i]=aiNew; alpha[jj]=ajNew;
+          changed++;
+        }
+      }
+      if(changed===0)passes++; else passes=0;
+    }
+    SVM.alpha=alpha; SVM.b=b;
+  }
+  function decision(px,py){
+    var s=SVM.b, X=SVM.X, Y=SVM.Y, a=SVM.alpha;
+    for(var i=0;i<X.length;i++){ if(a[i]>1e-6)s+=a[i]*Y[i]*kernel(X[i],[px,py]); }
+    return s;
+  }
+  var SVMd={min:-3,max:3};
+  function svmMap(canvas){var p={l:8,r:8,t:8,b:8}; var pw=canvas.width-p.l-p.r, ph=canvas.height-p.t-p.b;
+    return {
+      X:function(v){return p.l+(v-SVMd.min)/(SVMd.max-SVMd.min)*pw;},
+      Y:function(v){return p.t+(SVMd.max-v)/(SVMd.max-SVMd.min)*ph;}
+    };
+  }
+  function contour(ctx,field,R,m,level,style){
+    function gd(idx){return SVMd.min+(idx/R)*(SVMd.max-SVMd.min);}
+    ctx.beginPath();
+    for(var j=0;j<R;j++){
+      for(var i=0;i<R;i++){
+        var a=field[j][i], b=field[j][i+1], c=field[j+1][i+1], d=field[j+1][i];
+        var pts=[];
+        if((a>level)!==(b>level)){var t=(level-a)/(b-a);pts.push([i+t,j]);}
+        if((b>level)!==(c>level)){var t2=(level-b)/(c-b);pts.push([i+1,j+t2]);}
+        if((d>level)!==(c>level)){var t3=(level-d)/(c-d);pts.push([i+t3,j+1]);}
+        if((a>level)!==(d>level)){var t4=(level-a)/(d-a);pts.push([i,j+t4]);}
+        if(pts.length>=2){
+          ctx.moveTo(m.X(gd(pts[0][0])),m.Y(gd(pts[0][1])));
+          ctx.lineTo(m.X(gd(pts[1][0])),m.Y(gd(pts[1][1])));
+          if(pts.length===4){ctx.moveTo(m.X(gd(pts[2][0])),m.Y(gd(pts[2][1])));ctx.lineTo(m.X(gd(pts[3][0])),m.Y(gd(pts[3][1])));}
+        }
+      }
+    }
+    ctx.strokeStyle=style.color;ctx.lineWidth=style.w;
+    if(style.dash)ctx.setLineDash(style.dash); else ctx.setLineDash([]);
+    ctx.stroke();ctx.setLineDash([]);
+  }
+  function renderTab4(){
+    trainSVM();
+    var cv=fx('t4_canvas'), ctx=cv.getContext('2d');
+    var m=svmMap(cv);
+    var R=SVM.R;
+    var field=[];
+    for(var j=0;j<=R;j++){field[j]=new Array(R+1);
+      var gy=SVMd.min+(j/R)*(SVMd.max-SVMd.min);
+      for(var i=0;i<=R;i++){var gx=SVMd.min+(i/R)*(SVMd.max-SVMd.min); field[j][i]=decision(gx,gy);}
+    }
+    ctx.clearRect(0,0,cv.width,cv.height);
+    for(j=0;j<R;j++){for(i=0;i<R;i++){
+      var avg=(field[j][i]+field[j][i+1]+field[j+1][i]+field[j+1][i+1])/4;
+      var conf=Math.min(1,Math.abs(avg)/2);
+      var al=0.05+0.20*conf;
+      ctx.fillStyle=avg>=0?'rgba(124,58,237,'+al+')':'rgba(236,72,153,'+al+')';
+      var gx0=SVMd.min+(i/R)*(SVMd.max-SVMd.min), gy0=SVMd.min+(j/R)*(SVMd.max-SVMd.min);
+      var gx1=SVMd.min+((i+1)/R)*(SVMd.max-SVMd.min), gy1=SVMd.min+((j+1)/R)*(SVMd.max-SVMd.min);
+      ctx.fillRect(m.X(gx0),m.Y(gy1),m.X(gx1)-m.X(gx0)+1,m.Y(gy0)-m.Y(gy1)+1);
+    }}
+    contour(ctx,field,R,m,1,{color:'rgba(124,58,237,.55)',w:1.5,dash:[6,4]});
+    contour(ctx,field,R,m,-1,{color:'rgba(236,72,153,.55)',w:1.5,dash:[6,4]});
+    contour(ctx,field,R,m,0,{color:'#263056',w:2.5});
+    var acc=0,svCount=0;
+    for(i=0;i<SVM.X.length;i++){
+      var px=m.X(SVM.X[i][0]), py=m.Y(SVM.X[i][1]);
+      var isSV=SVM.alpha[i]>1e-4;
+      if(isSV)svCount++;
+      var fv=decision(SVM.X[i][0],SVM.X[i][1]);
+      if((fv>=0?1:-1)===SVM.Y[i])acc++;
+      if(isSV){ctx.beginPath();ctx.arc(px,py,9,0,7);ctx.strokeStyle='#16a34a';ctx.lineWidth=2.5;ctx.stroke();}
+      ctx.beginPath();ctx.arc(px,py,5.5,0,7);
+      ctx.fillStyle=SVM.Y[i]===1?'#7c3aed':'#ec4899';ctx.fill();
+      ctx.strokeStyle='#fff';ctx.lineWidth=1.4;ctx.stroke();
+    }
+    fx('t4_sv').textContent=svCount;
+    fx('t4_acc').textContent=pct(SVM.X.length>0?acc/SVM.X.length:0);
+    fx('t4_np').textContent=SVM.X.length;
+    if(kType()==='linear'){
+      var wx=0,wy=0;
+      for(i=0;i<SVM.X.length;i++){if(SVM.alpha[i]>1e-6){wx+=SVM.alpha[i]*SVM.Y[i]*SVM.X[i][0];wy+=SVM.alpha[i]*SVM.Y[i]*SVM.X[i][1];}}
+      var nrm=Math.sqrt(wx*wx+wy*wy);
+      fx('t4_margin').textContent=nrm>1e-6?(2/nrm).toFixed(2):'—';
+    } else { fx('t4_margin').textContent='—'; }
+  }
+  document.querySelectorAll('#t4_kernel button').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('#t4_kernel button').forEach(function(b){b.classList.remove('active');});
+      this.classList.add('active');
+      var k=this.getAttribute('data-k');
+      fx('t4_gammaWrap').style.display=(k==='rbf')?'block':'none';
+      fx('t4_degWrap').style.display=(k==='poly')?'block':'none';
+      renderTab4();
+    });
+  });
+  fx('t4_data').addEventListener('change',function(){SVM.seed=(Math.random()*1e9)|0;genSVMdata();renderTab4();});
+  fx('t4_c').addEventListener('input',function(){fx('t4_cV').textContent=Math.pow(10,+this.value).toFixed(2);renderTab4();});
+  fx('t4_g').addEventListener('input',function(){fx('t4_gV').textContent=(+this.value).toFixed(1);renderTab4();});
+  fx('t4_d').addEventListener('input',function(){fx('t4_dV').textContent=this.value;renderTab4();});
+  fx('t4_regen').addEventListener('click',function(){SVM.seed=(Math.random()*1e9)|0;genSVMdata();renderTab4();});
+
+  /* ============================================================
+     TAB SWITCHING
+     ============================================================ */
+  var activeTab='t1', rendered={t3:false,t4:false};
+  function renderActive(){
+    if(activeTab==='t1')renderTab1();
+    else if(activeTab==='t2')renderTab2();
+    else if(activeTab==='t3'){ if(!rendered.t3){genCV();rendered.t3=true;} renderTab3(); }
+    else if(activeTab==='t4'){ if(!rendered.t4){genSVMdata();rendered.t4=true;} renderTab4(); }
+  }
+  document.querySelectorAll('#tabs .tab').forEach(function(t){
+    t.addEventListener('click',function(){
+      document.querySelectorAll('#tabs .tab').forEach(function(b){b.classList.remove('active');});
+      document.querySelectorAll('.tabpane').forEach(function(p){p.classList.remove('active');});
+      this.classList.add('active');
+      activeTab=this.getAttribute('data-tab');
+      fx(activeTab).classList.add('active');
+      renderActive();
+    });
+  });
+
+  /* ---------- init ---------- */
+  genEval();
+  fx('t4_cV').textContent=Math.pow(10,+fx('t4_c').value).toFixed(2);
+  renderTab1();
+})();
+</script>
+</body>
+</html>

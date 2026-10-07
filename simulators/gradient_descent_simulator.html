@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>סימולטור: רגרסיה לינארית וגרדיאנט דיסנט</title>
+<style>
+/* ===== Shared theme kit for ML-course simulators & interactive labs =====
+   Inline this verbatim inside a <style> block so the file stays self-contained.
+   Matches the upgraded tutorials (indigo/violet, light cards, RTL). Add your own
+   component CSS below it as needed. */
+:root{
+  --primary:#6366f1; --primary-600:#4f46e5; --secondary:#7c3aed; --secondary-600:#6d28d9;
+  --accent:#ec4899; --info:#3b82f6; --success:#16a34a; --success-500:#22c55e;
+  --warning:#ef4444; --amber:#f59e0b; --ink:#263056; --muted:#5a6688;
+  --surface:#fff; --surface-2:#f6f8fd; --surface-3:#eef2fb; --line:#e4e9f5; --line-2:#d7deee;
+  --grad:linear-gradient(135deg,var(--primary),var(--secondary));
+  --grad-soft:linear-gradient(135deg,#eef2ff,#f5edff);
+  --r-sm:8px; --r-md:14px; --r-lg:20px; --r-pill:999px;
+  --sh-sm:0 2px 6px rgba(30,36,64,.07); --sh-md:0 8px 24px rgba(30,36,64,.10); --sh-lg:0 16px 44px rgba(30,36,64,.16);
+  --font:"Segoe UI","Assistant","Heebo","Rubik","Noto Sans Hebrew",Tahoma,Arial,sans-serif;
+  --mono:"JetBrains Mono","Fira Code","Consolas","Courier New",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);color:var(--ink);line-height:1.7;min-height:100vh;
+  background:linear-gradient(135deg,#6366f1 0%,#7c3aed 55%,#9333ea 100%) fixed;-webkit-font-smoothing:antialiased}
+.sim-wrap{max-width:1180px;margin:0 auto;padding:1.6rem}
+header,.sim-header{position:relative;overflow:hidden;background:var(--surface);border-radius:var(--r-lg);
+  padding:1.8rem 2rem;margin-bottom:1.2rem;box-shadow:var(--sh-lg);text-align:center}
+header::before,.sim-header::before{content:"";position:absolute;inset-inline:0;top:0;height:6px;
+  background:linear-gradient(90deg,var(--primary),var(--secondary),var(--accent))}
+h1{font-size:clamp(1.5rem,3.4vw,2.2rem);font-weight:800;letter-spacing:-.01em;line-height:1.2;
+  background:linear-gradient(120deg,var(--primary-600),var(--secondary),var(--accent));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle,header p{color:var(--muted);font-size:1.05rem;margin-top:.4rem}
+h2{color:var(--primary-600);font-size:1.3rem;font-weight:800;margin:.2rem 0 .8rem}
+h3{color:var(--secondary-600);font-size:1.1rem;font-weight:700;margin:.6rem 0 .4rem}
+
+/* tabs */
+.tabs{display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center;background:rgba(255,255,255,.85);
+  backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:var(--r-pill);
+  padding:.5rem;margin-bottom:1.2rem;box-shadow:var(--sh-sm);position:sticky;top:.5rem;z-index:50}
+.tab{padding:.5rem 1.1rem;border-radius:var(--r-pill);cursor:pointer;font-weight:600;font-size:.92rem;
+  color:var(--muted);border:1px solid transparent;background:none;font-family:inherit;transition:all .2s}
+.tab:hover{background:var(--surface-3);color:var(--primary-600)}
+.tab.active{background:var(--grad);color:#fff;box-shadow:var(--sh-sm)}
+.tabpane{display:none;animation:fade .4s ease}
+.tabpane.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* panels / cards */
+.panel,.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:1.4rem;margin-bottom:1.2rem;box-shadow:var(--sh-md)}
+.panel-grid{display:grid;grid-template-columns:320px 1fr;gap:1.2rem;align-items:start}
+@media(max-width:820px){.panel-grid{grid-template-columns:1fr}}
+
+/* controls */
+.controls{display:flex;flex-direction:column;gap:1rem}
+.control label{display:flex;justify-content:space-between;font-weight:600;font-size:.9rem;margin-bottom:.35rem}
+.control label .val{color:var(--secondary-600);font-family:var(--mono);background:var(--surface-3);
+  padding:.05rem .5rem;border-radius:var(--r-pill)}
+input[type=range]{width:100%;height:8px;border-radius:var(--r-pill);background:var(--surface-3);
+  outline:none;-webkit-appearance:none;appearance:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+  background:var(--grad);cursor:pointer;border:2px solid #fff;box-shadow:var(--sh-sm)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--secondary);
+  cursor:pointer;border:2px solid #fff}
+select,input[type=number]{font-family:inherit;padding:.45rem .7rem;border:1px solid var(--line-2);
+  border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font-size:.9rem}
+.btn,.btn2{padding:.6rem 1.2rem;border:none;border-radius:var(--r-pill);font-weight:700;cursor:pointer;
+  font-family:inherit;font-size:.92rem;transition:transform .15s,box-shadow .15s;display:inline-flex;align-items:center;gap:.4rem}
+.btn{background:var(--grad);color:#fff;box-shadow:var(--sh-sm)}
+.btn:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
+.btn2{background:var(--surface);color:var(--primary-600);border:2px solid var(--primary)}
+.btn2:hover{background:var(--primary);color:#fff}
+.btnrow{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
+.seg{display:inline-flex;background:var(--surface-3);border-radius:var(--r-pill);padding:.2rem}
+.seg button{border:none;background:none;padding:.4rem .9rem;border-radius:var(--r-pill);cursor:pointer;
+  font-family:inherit;font-weight:600;font-size:.85rem;color:var(--muted)}
+.seg button.active{background:var(--grad);color:#fff}
+
+/* canvas / viz */
+canvas{max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);
+  box-shadow:var(--sh-sm);display:block}
+.viz{display:flex;flex-direction:column;gap:1rem;align-items:center}
+
+/* stat readouts */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.8rem;margin:.4rem 0}
+.stat{background:var(--grad-soft);border:1px solid var(--line);border-radius:var(--r-md);padding:.8rem;text-align:center}
+.stat .k{font-size:.78rem;color:var(--muted);font-weight:600}
+.stat .v{font-size:1.5rem;font-weight:800;color:var(--secondary-600);font-family:var(--mono)}
+
+/* notes / hints */
+.note,.hint{border-radius:var(--r-md);padding:1rem 1.2rem;margin:.8rem 0;border-inline-start:5px solid var(--info);
+  background:linear-gradient(135deg,#eff6ff,#e0efff)}
+.hint{border-inline-start-color:var(--amber);background:linear-gradient(135deg,#fffbeb,#fef3c7)}
+.note h3,.hint h3{margin-top:0}
+
+/* code / output */
+pre{background:#1e293b;color:#e2e8f0;padding:1.2rem;border-radius:var(--r-md);overflow-x:auto;
+  direction:ltr;text-align:left;font-family:var(--mono);font-size:.86rem;line-height:1.55;border:1px solid #2c3a52}
+code{font-family:var(--mono);background:var(--surface-3);color:#4338ca;padding:.1rem .4rem;border-radius:5px;font-size:.88em}
+.output{background:#0f172a;color:#c7f9cc;font-family:var(--mono);font-size:.82rem;padding:1rem 1.2rem;
+  border-radius:var(--r-md);overflow-x:auto;direction:ltr;text-align:left;white-space:pre;border:1px solid #14532d}
+
+/* tables */
+table{width:100%;border-collapse:collapse;margin:.6rem 0;border-radius:var(--r-md);overflow:hidden;box-shadow:var(--sh-sm)}
+th{background:var(--grad);color:#fff;padding:.6rem;font-weight:700}
+td{padding:.55rem;border-bottom:1px solid var(--line);text-align:center}
+tr:nth-child(even) td{background:var(--surface-2)}
+
+footer{color:#ede9fe;text-align:center;font-size:.85rem;padding:1.2rem;opacity:.9}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+/* ===== component CSS (page-specific) ===== */
+.eyebrow{display:inline-block;font-size:.8rem;font-weight:700;letter-spacing:.04em;color:var(--secondary-600);
+  background:var(--surface-3);padding:.2rem .8rem;border-radius:var(--r-pill);margin-bottom:.5rem}
+.canvas-row{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center;align-items:flex-start}
+.canvas-box{display:flex;flex-direction:column;gap:.4rem;align-items:center}
+.canvas-box .cap{font-size:.82rem;font-weight:700;color:var(--muted)}
+.legend{display:flex;gap:.9rem;flex-wrap:wrap;justify-content:center;font-size:.82rem;color:var(--muted);margin-top:.2rem}
+.legend span{display:inline-flex;align-items:center;gap:.35rem;font-weight:600}
+.legend i{width:16px;height:4px;border-radius:2px;display:inline-block}
+.legend i.dot{width:11px;height:11px;border-radius:50%}
+.eq{font-family:var(--mono);direction:ltr;text-align:center;background:var(--surface-3);color:var(--primary-600);
+  padding:.5rem .7rem;border-radius:var(--r-sm);font-weight:700;font-size:.95rem;letter-spacing:.02em}
+.status{font-weight:800;font-size:.95rem;padding:.45rem .8rem;border-radius:var(--r-pill);text-align:center}
+.status.ok{background:#dcfce7;color:#15803d}
+.status.run{background:#e0e7ff;color:#4338ca}
+.status.warn{background:#fee2e2;color:#b91c1c}
+.status.idle{background:var(--surface-3);color:var(--muted)}
+.chk{display:flex;align-items:center;gap:.5rem;font-weight:600;font-size:.9rem;cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:var(--secondary)}
+.small{font-size:.82rem;color:var(--muted)}
+.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.mini-grid .stat .v{font-size:1.15rem}
+.divider{height:1px;background:var(--line);margin:.4rem 0}
+</style>
+</head>
+<body>
+<div class="sim-wrap">
+
+  <header>
+    <span class="eyebrow">עקרונות בלמידת מכונה · שבוע 5</span>
+    <h1>סימולטור: רגרסיה לינארית וגרדיאנט דיסנט</h1>
+    <p class="subtitle">חקרו התאמת קו, ירידת גרדיאנט על משטח העלות, השוואת OLS↔GD, ואוברפיטינג פולינומי — הכול אינטראקטיבי וחי</p>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="fit">קו ההתאמה</button>
+    <button class="tab" data-tab="gd">גרדיאנט דיסנט</button>
+    <button class="tab" data-tab="cmp">OLS מול GD</button>
+    <button class="tab" data-tab="poly">אוברפיטינג פולינומי</button>
+  </nav>
+
+  <!-- ================= TAB 1 : LINE FITTING ================= -->
+  <section class="tabpane active" data-pane="fit">
+    <div class="panel">
+      <h2>התאמת קו ידנית — MSE ו‑R²</h2>
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control">
+            <label>שיפוע <span dir="ltr">θ₁ (slope)</span> <span class="val" id="f_t1v">1.00</span></label>
+            <input type="range" id="f_t1" min="-3" max="5" step="0.05" value="1">
+          </div>
+          <div class="control">
+            <label>חיתוך <span dir="ltr">θ₀ (intercept)</span> <span class="val" id="f_t0v">2.0</span></label>
+            <input type="range" id="f_t0" min="-5" max="15" step="0.1" value="2">
+          </div>
+          <div class="eq" id="f_eq">ŷ = 2.00 + 1.00·x</div>
+          <div class="divider"></div>
+          <label class="chk"><input type="checkbox" id="f_res" checked> הצג שאריות (residuals)</label>
+          <label class="chk"><input type="checkbox" id="f_ols"> הצג את קו ה‑OLS (רפאים)</label>
+          <div class="btnrow">
+            <button class="btn" id="f_fit">התאם אוטומטית (OLS)</button>
+          </div>
+          <div class="btnrow">
+            <button class="btn2" id="f_reset">אפס נתונים</button>
+            <button class="btn2" id="f_noise">נתונים אקראיים</button>
+          </div>
+          <p class="small">לחצו על אזור ריק כדי <b>להוסיף</b> נקודה, גררו נקודה כדי <b>להזיז</b> אותה, ולחיצה כפולה <b>מוחקת</b>.</p>
+        </div>
+        <div class="viz">
+          <canvas id="f_canvas"></canvas>
+          <div class="legend">
+            <span><i class="dot" style="background:#6366f1"></i>נקודות נתונים</span>
+            <span><i style="background:#ec4899;height:4px"></i>קו התאמה</span>
+            <span><i style="background:#f59e0b;height:4px"></i>שארית</span>
+          </div>
+          <div class="stat-grid" style="width:100%">
+            <div class="stat"><div class="k">MSE (שגיאה ריבועית ממוצעת)</div><div class="v" id="f_mse">—</div></div>
+            <div class="stat"><div class="k">R² (מקדם ההסבר)</div><div class="v" id="f_r2">—</div></div>
+            <div class="stat"><div class="k">מספר נקודות n</div><div class="v" id="f_n">0</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="hint">
+        <h3>מה כדאי לשים לב</h3>
+        הזיזו את <span dir="ltr">θ₀,θ₁</span> וצפו איך אורך השאריות (הקווים הכתומים האנכיים) קובע את ה‑MSE — MSE הוא ממוצע ריבועי השאריות.
+        לחצו “התאם אוטומטית” כדי לקפוץ לפתרון <b>הריבועים הפחותים</b> (OLS) — נקודת המינימום היחידה שממזערת את MSE.
+        R² קרוב ל‑1 אומר שהקו מסביר כמעט את כל השונות; R² שלילי אפשרי אם הקו גרוע מקו הממוצע.
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 2 : GRADIENT DESCENT ================= -->
+  <section class="tabpane" data-pane="gd">
+    <div class="panel">
+      <h2>ירידת גרדיאנט על משטח העלות MSE(θ₀,θ₁)</h2>
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control">
+            <label>קצב למידה <span dir="ltr">α (learning rate)</span> <span class="val" id="g_av">0.010</span></label>
+            <input type="range" id="g_a" min="0.001" max="0.05" step="0.0005" value="0.01">
+          </div>
+          <p class="small" id="g_crit">קצב קריטי משוער ≈ —</p>
+          <div class="btnrow">
+            <button class="btn" id="g_play">▶ הרץ</button>
+            <button class="btn2" id="g_step">צעד יחיד</button>
+          </div>
+          <div class="btnrow">
+            <button class="btn2" id="g_reset">אפס</button>
+            <button class="btn2" id="g_data">נתונים אקראיים</button>
+          </div>
+          <div class="status idle" id="g_status">מוכן</div>
+          <div class="divider"></div>
+          <div class="mini-grid">
+            <div class="stat"><div class="k">איטרציה</div><div class="v" id="g_iter">0</div></div>
+            <div class="stat"><div class="k">עלות MSE</div><div class="v" id="g_cost">—</div></div>
+            <div class="stat"><div class="k" dir="ltr">θ₀</div><div class="v" id="g_t0">—</div></div>
+            <div class="stat"><div class="k" dir="ltr">θ₁</div><div class="v" id="g_t1">—</div></div>
+          </div>
+          <p class="small">לחצו על מפת החום כדי לבחור נקודת התחלה חדשה של הצעד.</p>
+        </div>
+        <div class="viz">
+          <div class="canvas-row">
+            <div class="canvas-box">
+              <div class="cap">משטח העלות + מסלול הירידה</div>
+              <canvas id="g_surf"></canvas>
+              <div class="legend">
+                <span><i class="dot" style="background:#22c55e"></i>מינימום (OLS)</span>
+                <span><i class="dot" style="background:#ef4444"></i>נקודה נוכחית</span>
+                <span><i style="background:#111;height:3px"></i>מסלול</span>
+              </div>
+            </div>
+            <div class="canvas-box">
+              <div class="cap">עלות לעומת איטרציה</div>
+              <canvas id="g_chart"></canvas>
+              <div class="small" id="g_chartnote">התכנסות — העלות יורדת ומתייצבת</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="hint">
+        <h3>מה כדאי לשים לב</h3>
+        כל צעד זז בכיוון <b>הפוך לגרדיאנט</b> (במורד המדרון) בגודל שנקבע על ידי <span dir="ltr">α</span>. משטח העלות של רגרסיה לינארית הוא
+        <b>קמור</b> — קערה עם מינימום יחיד, ולכן GD תמיד מגיע אליו אם <span dir="ltr">α</span> קטן מספיק.
+        הגדילו את <span dir="ltr">α</span> מעל הקצב הקריטי וצפו ב<b>התבדרות</b>: המסלול קופץ החוצה והעלות מתפוצצת. קצב קטן מדי — התכנסות איטית מאוד.
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 3 : OLS vs GD ================= -->
+  <section class="tabpane" data-pane="cmp">
+    <div class="panel">
+      <h2>OLS מול Gradient Descent — השוואת התוצאות</h2>
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control">
+            <label>קצב למידה <span dir="ltr">α</span> <span class="val" id="c_av">0.010</span></label>
+            <input type="range" id="c_a" min="0.001" max="0.05" step="0.0005" value="0.01">
+          </div>
+          <div class="control">
+            <label>מקסימום איטרציות <span class="val" id="c_mv">2000</span></label>
+            <input type="range" id="c_m" min="50" max="5000" step="50" value="2000">
+          </div>
+          <div class="control">
+            <label>סף עצירה <span dir="ltr">‖grad‖</span> <span class="val" id="c_tv">1e-4</span></label>
+            <input type="range" id="c_t" min="-6" max="-1" step="0.5" value="-4">
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="c_run">הרץ השוואה</button>
+            <button class="btn2" id="c_data">נתונים אקראיים</button>
+          </div>
+          <div class="status idle" id="c_status">מוכן</div>
+        </div>
+        <div class="viz">
+          <table id="c_table">
+            <thead><tr><th>שיטה</th><th dir="ltr">θ₀</th><th dir="ltr">θ₁</th><th>MSE</th><th>איטרציות</th></tr></thead>
+            <tbody>
+              <tr><td><b>OLS</b> (נוסחה סגורה)</td><td id="c_o0">—</td><td id="c_o1">—</td><td id="c_omse">—</td><td>1 (מיידי)</td></tr>
+              <tr><td><b>GD</b> (איטרטיבי)</td><td id="c_g0">—</td><td id="c_g1">—</td><td id="c_gmse">—</td><td id="c_git">—</td></tr>
+              <tr><td>הפרש ‖Δθ‖</td><td colspan="2" id="c_dth">—</td><td colspan="2" id="c_dmse">—</td></tr>
+            </tbody>
+          </table>
+          <div class="canvas-row">
+            <div class="canvas-box">
+              <div class="cap">שני הקווים על הנתונים</div>
+              <canvas id="c_fit"></canvas>
+              <div class="legend">
+                <span><i style="background:#16a34a;height:4px"></i>OLS</span>
+                <span><i style="background:#ec4899;height:4px"></i>GD</span>
+              </div>
+            </div>
+            <div class="canvas-box">
+              <div class="cap">התכנסות GD (לוג עלות)</div>
+              <canvas id="c_conv"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>מה כדאי לשים לב</h3>
+        OLS פותר את המשוואות הנורמליות ומחזיר את הפתרון המדויק ב<b>צעד אחד</b> — אבל דורש היפוך מטריצה
+        (<span dir="ltr">O(d³)</span> במספר התכונות), מה שיקר כשיש הרבה תכונות. GD מתקרב לאותו פתרון <b>הדרגתית</b> ומתאים לנתוני ענק,
+        אך רגיש לבחירת <span dir="ltr">α</span>. כשהוא מתכנס — שני הקווים כמעט חופפים וההפרש ‖Δθ‖ זעיר.
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 4 : POLYNOMIAL OVERFITTING ================= -->
+  <section class="tabpane" data-pane="poly">
+    <div class="panel">
+      <h2>אוברפיטינג — דרגת פולינום מול שגיאת אימון/מבחן</h2>
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control">
+            <label>דרגת הפולינום <span dir="ltr">(degree)</span> <span class="val" id="p_dv">4</span></label>
+            <input type="range" id="p_d" min="1" max="15" step="1" value="4">
+          </div>
+          <div class="control">
+            <label>רעש בנתונים <span dir="ltr">(σ)</span> <span class="val" id="p_nv">0.8</span></label>
+            <input type="range" id="p_n" min="0" max="2.5" step="0.1" value="0.8">
+          </div>
+          <div class="control">
+            <label>מספר נקודות אימון <span class="val" id="p_kv">16</span></label>
+            <input type="range" id="p_k" min="8" max="40" step="1" value="16">
+          </div>
+          <div class="btnrow">
+            <button class="btn2" id="p_regen">רענן נתונים</button>
+          </div>
+          <div class="divider"></div>
+          <div class="mini-grid">
+            <div class="stat"><div class="k">שגיאת אימון</div><div class="v" id="p_tr">—</div></div>
+            <div class="stat"><div class="k">שגיאת מבחן</div><div class="v" id="p_te">—</div></div>
+          </div>
+          <div class="stat" style="margin-top:.4rem"><div class="k">דרגה מיטבית (מינימום מבחן)</div><div class="v" id="p_best">—</div></div>
+        </div>
+        <div class="viz">
+          <div class="canvas-row">
+            <div class="canvas-box">
+              <div class="cap">ההתאמה על הנתונים</div>
+              <canvas id="p_fit"></canvas>
+              <div class="legend">
+                <span><i class="dot" style="background:#6366f1"></i>אימון</span>
+                <span><i class="dot" style="background:#ec4899"></i>מבחן</span>
+                <span><i style="background:#16a34a;height:4px"></i>הפולינום</span>
+                <span><i style="background:#94a3b8;height:3px"></i>פונקציית האמת</span>
+              </div>
+            </div>
+            <div class="canvas-box">
+              <div class="cap">שגיאה לעומת דרגה</div>
+              <canvas id="p_err"></canvas>
+              <div class="legend">
+                <span><i style="background:#3b82f6;height:4px"></i>אימון</span>
+                <span><i style="background:#ef4444;height:4px"></i>מבחן</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="hint">
+        <h3>מה כדאי לשים לב</h3>
+        דרגה נמוכה מדי — <b>תת‑התאמה</b> (underfitting): הקו קשיח מדי ושתי השגיאות גבוהות. ככל שמעלים דרגה שגיאת ה<b>אימון</b> יורדת עד לאפס
+        (הפולינום “משנן” כל נקודה), אך שגיאת ה<b>מבחן</b> יורדת ואז <b>מתחילה לעלות</b> — עקומת ה‑U הקלאסית. המינימום שלה מסמן את הדרגה המיטבית.
+        שימו לב לגלים הפראיים של הפולינום בדרגות גבוהות בין נקודות האימון — זה בדיוק אוברפיטינג.
+      </div>
+    </div>
+  </section>
+
+  <footer>קורס 6100034 · עקרונות בלמידת מכונה · ד״ר חן גלעדי · SCE אשדוד</footer>
+</div>
+
+<script>
+"use strict";
+/* ========================= shared utilities ========================= */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function fmt(v,d){ if(d==null)d=3; if(v==null||!isFinite(v)) return '—'; return (+v).toFixed(d); }
+function fmtSci(v){ if(v==null||!isFinite(v)) return '—'; if(v!==0 && (Math.abs(v)<1e-3||Math.abs(v)>=1e5)) return v.toExponential(2); return v.toFixed(4); }
+function clamp(v,a,b){return v<a?a:(v>b?b:v);}
+
+function setupCanvas(canvas,w,h){
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=Math.round(w*dpr); canvas.height=Math.round(h*dpr);
+  canvas.style.width=w+'px'; canvas.style.height=h+'px';
+  canvas._cssW=w; canvas._cssH=h;
+  const ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  return ctx;
+}
+function relPos(canvas,evt){
+  const r=canvas.getBoundingClientRect();
+  return {x:(evt.clientX-r.left)*(canvas._cssW/(r.width||1)), y:(evt.clientY-r.top)*(canvas._cssH/(r.height||1))};
+}
+function plotTf(w,h,pad,xmin,xmax,ymin,ymax){
+  const L=pad.l,R=w-pad.r,T=pad.t,B=h-pad.b;
+  const dx=(xmax-xmin)||1, dy=(ymax-ymin)||1;
+  return {
+    L:L,R:R,T:T,B:B,xmin:xmin,xmax:xmax,ymin:ymin,ymax:ymax,
+    sx:x=>L+(x-xmin)/dx*(R-L),
+    sy:y=>B-(y-ymin)/dy*(B-T),
+    ix:px=>xmin+(px-L)/((R-L)||1)*dx,
+    iy:py=>ymin+(B-py)/((B-T)||1)*dy
+  };
+}
+function drawAxes(ctx,tf,opts){
+  opts=opts||{};
+  const L=tf.L,R=tf.R,T=tf.T,B=tf.B;
+  const nx=opts.nx||6, ny=opts.ny||5;
+  ctx.font='10px monospace'; ctx.textAlign='center'; ctx.textBaseline='top';
+  for(let i=0;i<=nx;i++){
+    const x=tf.xmin+(tf.xmax-tf.xmin)*i/nx; const px=tf.sx(x);
+    ctx.strokeStyle='#eef2fb'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(px,T); ctx.lineTo(px,B); ctx.stroke();
+    ctx.fillStyle='#8892b0'; ctx.fillText((Math.abs(x)<1e-9?0:x).toFixed(opts.xd==null?1:opts.xd),px,B+4);
+  }
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let j=0;j<=ny;j++){
+    const y=tf.ymin+(tf.ymax-tf.ymin)*j/ny; const py=tf.sy(y);
+    ctx.strokeStyle='#eef2fb'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(L,py); ctx.lineTo(R,py); ctx.stroke();
+    ctx.fillStyle='#8892b0'; ctx.fillText((Math.abs(y)<1e-9?0:y).toFixed(opts.yd==null?1:opts.yd),L-4,py);
+  }
+  ctx.strokeStyle='#c7cfe0'; ctx.lineWidth=1.2; ctx.strokeRect(L,T,R-L,B-T);
+  if(opts.xlab){ctx.fillStyle='#5a6688';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(opts.xlab,(L+R)/2,B+16);}
+  if(opts.ylab){ctx.save();ctx.translate(L-32,(T+B)/2);ctx.rotate(-Math.PI/2);ctx.fillStyle='#5a6688';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText(opts.ylab,0,0);ctx.restore();}
+}
+
+/* ========================= shared dataset (tabs 1-3) ========================= */
+let DATA=[]; // {x,y}
+const VIEW={xmin:-0.5,xmax:10.5,ymin:-1,ymax:18};
+function genData(seed){
+  const rnd=mulberry32(seed);
+  const arr=[]; const n=12;
+  for(let i=0;i<n;i++){
+    const x=0.6+i*(8.6/(n-1));
+    const y=3+1.2*x+(rnd()*2-1)*1.9;
+    arr.push({x:+x.toFixed(2),y:+y.toFixed(2)});
+  }
+  return arr;
+}
+DATA=genData(7);
+
+function predict(t0,t1,x){return t0+t1*x;}
+function cost(t0,t1){ const n=DATA.length; if(!n)return 0; let s=0; for(let i=0;i<n;i++){const e=t0+t1*DATA[i].x-DATA[i].y; s+=e*e;} return s/n; }
+function grad(t0,t1){ const n=DATA.length; if(!n)return[0,0]; let g0=0,g1=0; for(let i=0;i<n;i++){const e=t0+t1*DATA[i].x-DATA[i].y; g0+=e; g1+=e*DATA[i].x;} return [2*g0/n,2*g1/n]; }
+function olsFit(){
+  const n=DATA.length; if(n<2)return{t0:n?DATA[0].y:0,t1:0};
+  let sx=0,sy=0; for(let i=0;i<n;i++){sx+=DATA[i].x;sy+=DATA[i].y;}
+  const mx=sx/n,my=sy/n; let num=0,den=0;
+  for(let i=0;i<n;i++){num+=(DATA[i].x-mx)*(DATA[i].y-my);den+=(DATA[i].x-mx)*(DATA[i].x-mx);}
+  const t1=den>1e-12?num/den:0; const t0=my-t1*mx; return {t0,t1};
+}
+function r2Of(t0,t1){
+  const n=DATA.length; if(n<2)return NaN;
+  let my=0; for(let i=0;i<n;i++)my+=DATA[i].y; my/=n;
+  let ssr=0,sst=0; for(let i=0;i<n;i++){const e=t0+t1*DATA[i].x-DATA[i].y; ssr+=e*e; const d=DATA[i].y-my; sst+=d*d;}
+  return sst>1e-12?1-ssr/sst:NaN;
+}
+function dataMoments(){
+  const n=DATA.length; let sx=0,sx2=0; for(let i=0;i<n;i++){sx+=DATA[i].x;sx2+=DATA[i].x*DATA[i].x;}
+  const mx=n?sx/n:0, m2=n?sx2/n:0; return {mx,m2};
+}
+function alphaCrit(){
+  const m=dataMoments();
+  const tr=1+m.m2, det=m.m2-m.mx*m.mx;
+  const disc=Math.sqrt(Math.max(0,tr*tr/4-det));
+  const lmaxA=tr/2+disc;
+  return lmaxA>1e-9?1/lmaxA:0.03;
+}
+function eig2(a,b,c){ // M=[[a,b],[b,c]] symmetric
+  const tr=a+c, det=a*c-b*b, d=Math.sqrt(Math.max(0,tr*tr/4-det));
+  const l1=tr/2+d, l2=tr/2-d;
+  let v1; if(Math.abs(b)>1e-9)v1=[l1-c,b]; else v1=(a>=c)?[1,0]:[0,1];
+  const nn=Math.hypot(v1[0],v1[1])||1; v1=[v1[0]/nn,v1[1]/nn];
+  const v2=[-v1[1],v1[0]];
+  return {l1,l2,v1,v2};
+}
+
+/* ========================= TAB 1 : line fitting ========================= */
+const T1=(function(){
+  const cv=document.getElementById('f_canvas');
+  const ctx=setupCanvas(cv,560,420);
+  const st1=document.getElementById('f_t1'), st0=document.getElementById('f_t0');
+  const drag={idx:-1};
+  function tf(){return plotTf(560,420,{l:44,r:16,t:16,b:34},VIEW.xmin,VIEW.xmax,VIEW.ymin,VIEW.ymax);}
+  function draw(){
+    ctx.clearRect(0,0,560,420);
+    const T=tf();
+    drawAxes(ctx,T,{nx:6,ny:6,xd:0,yd:0,xlab:'x',ylab:'y'});
+    const t0=+st0.value,t1=+st1.value;
+    if(document.getElementById('f_ols').checked){
+      const o=olsFit();
+      ctx.strokeStyle='rgba(22,163,74,.5)'; ctx.lineWidth=2; ctx.setLineDash([6,5]);
+      ctx.beginPath(); ctx.moveTo(T.sx(VIEW.xmin),T.sy(o.t0+o.t1*VIEW.xmin)); ctx.lineTo(T.sx(VIEW.xmax),T.sy(o.t0+o.t1*VIEW.xmax)); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if(document.getElementById('f_res').checked){
+      ctx.strokeStyle='rgba(245,158,11,.85)'; ctx.lineWidth=1.6;
+      for(let i=0;i<DATA.length;i++){const p=DATA[i]; const yh=t0+t1*p.x;
+        ctx.beginPath(); ctx.moveTo(T.sx(p.x),T.sy(p.y)); ctx.lineTo(T.sx(p.x),T.sy(yh)); ctx.stroke();}
+    }
+    ctx.strokeStyle='#ec4899'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(T.sx(VIEW.xmin),T.sy(t0+t1*VIEW.xmin)); ctx.lineTo(T.sx(VIEW.xmax),T.sy(t0+t1*VIEW.xmax)); ctx.stroke();
+    for(let i=0;i<DATA.length;i++){const p=DATA[i];
+      ctx.beginPath(); ctx.arc(T.sx(p.x),T.sy(p.y),6,0,7); ctx.fillStyle='#6366f1'; ctx.fill();
+      ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.stroke();
+    }
+    document.getElementById('f_t0v').textContent=fmt(t0,2);
+    document.getElementById('f_t1v').textContent=fmt(t1,2);
+    document.getElementById('f_eq').textContent='ŷ = '+fmt(t0,2)+' + '+fmt(t1,2)+'·x';
+    document.getElementById('f_mse').textContent=fmt(cost(t0,t1),3);
+    const r2=r2Of(t0,t1); document.getElementById('f_r2').textContent=isFinite(r2)?fmt(r2,3):'—';
+    document.getElementById('f_n').textContent=DATA.length;
+  }
+  function nearest(px,py){
+    const T=tf(); let best=-1,bd=1e9;
+    for(let i=0;i<DATA.length;i++){const dx=T.sx(DATA[i].x)-px,dy=T.sy(DATA[i].y)-py;const d=dx*dx+dy*dy;if(d<bd){bd=d;best=i;}}
+    return {idx:best,dist:Math.sqrt(bd)};
+  }
+  cv.addEventListener('pointerdown',e=>{
+    const p=relPos(cv,e); const nr=nearest(p.x,p.y); const T=tf();
+    if(nr.idx>=0 && nr.dist<14){ drag.idx=nr.idx; }
+    else {
+      const wx=clamp(T.ix(p.x),VIEW.xmin,VIEW.xmax), wy=clamp(T.iy(p.y),VIEW.ymin,VIEW.ymax);
+      DATA.push({x:+wx.toFixed(2),y:+wy.toFixed(2)}); drag.idx=DATA.length-1; onDataChanged();
+    }
+    cv.setPointerCapture(e.pointerId); draw();
+  });
+  cv.addEventListener('pointermove',e=>{
+    if(drag.idx<0)return; const p=relPos(cv,e); const T=tf();
+    DATA[drag.idx]={x:+clamp(T.ix(p.x),VIEW.xmin,VIEW.xmax).toFixed(2),y:+clamp(T.iy(p.y),VIEW.ymin,VIEW.ymax).toFixed(2)};
+    draw();
+  });
+  cv.addEventListener('pointerup',e=>{ if(drag.idx>=0){drag.idx=-1; onDataChanged();} });
+  cv.addEventListener('dblclick',e=>{
+    const p=relPos(cv,e); const nr=nearest(p.x,p.y);
+    if(nr.idx>=0 && nr.dist<16 && DATA.length>2){ DATA.splice(nr.idx,1); onDataChanged(); draw(); }
+  });
+  st0.addEventListener('input',draw); st1.addEventListener('input',draw);
+  document.getElementById('f_res').addEventListener('change',draw);
+  document.getElementById('f_ols').addEventListener('change',draw);
+  document.getElementById('f_fit').addEventListener('click',()=>{
+    const o=olsFit();
+    st0.value=clamp(o.t0,+st0.min,+st0.max); st1.value=clamp(o.t1,+st1.min,+st1.max); draw();
+  });
+  document.getElementById('f_reset').addEventListener('click',()=>{DATA=genData(7);onDataChanged();draw();});
+  document.getElementById('f_noise').addEventListener('click',()=>{DATA=genData((Math.random()*1e6)|0);onDataChanged();draw();});
+  return {draw};
+})();
+
+/* ========================= TAB 2 : gradient descent ========================= */
+const T2=(function(){
+  const surf=document.getElementById('g_surf'); const sctx=setupCanvas(surf,440,400);
+  const chart=document.getElementById('g_chart'); const cctx=setupCanvas(chart,300,400);
+  const slA=document.getElementById('g_a'), avEl=document.getElementById('g_av'), critEl=document.getElementById('g_crit');
+  let cache=null, state=null, timer=null;
+  const PAD={l:46,r:14,t:14,b:34};
+
+  function bounds(){
+    const o=olsFit();
+    const ys=DATA.map(p=>p.y), xs=DATA.map(p=>p.x);
+    const yr=(Math.max.apply(null,ys)-Math.min.apply(null,ys))||1;
+    const xr=(Math.max.apply(null,xs)-Math.min.apply(null,xs))||1;
+    const d0=Math.max(4,yr*1.15), d1=Math.max(1.2,2.4*yr/xr);
+    return {t0min:o.t0-d0,t0max:o.t0+d0,t1min:o.t1-d1,t1max:o.t1+d1,opt:o};
+  }
+  function surfTf(b){return plotTf(440,400,PAD,b.t0min,b.t0max,b.t1min,b.t1max);}
+  function lerp3(a,b,t){return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+  function heatColor(t){
+    const lo=[30,27,75], mid=[124,58,237], hi=[251,207,232];
+    return t<0.5? lerp3(lo,mid,t*2) : lerp3(mid,hi,(t-0.5)*2);
+  }
+  function buildCache(){
+    const b=bounds(); const T=surfTf(b); const m=dataMoments();
+    const M={a:1,b:m.mx,c:m.m2}; const cmin=cost(b.opt.t0,b.opt.t1);
+    const corners=[[b.t0min,b.t1min],[b.t0max,b.t1min],[b.t0min,b.t1max],[b.t0max,b.t1max]];
+    let vmax=cmin; for(let i=0;i<corners.length;i++){const v=cost(corners[i][0],corners[i][1]); if(v>vmax)vmax=v;}
+    const rw=Math.max(2,Math.round(T.R-T.L)), rh=Math.max(2,Math.round(T.B-T.T));
+    const off=document.createElement('canvas'); off.width=rw; off.height=rh;
+    const octx=off.getContext('2d'); const img=octx.createImageData(rw,rh);
+    const lmin=Math.log(cmin+1e-6), lmax=Math.log(vmax+1e-6), lden=(lmax-lmin)||1;
+    for(let py=0;py<rh;py++){
+      const t1=T.iy(T.T+py+0.5);
+      for(let px=0;px<rw;px++){
+        const t0=T.ix(T.L+px+0.5);
+        const d0=t0-b.opt.t0, d1=t1-b.opt.t1;
+        const v=cmin + M.a*d0*d0 + 2*M.b*d0*d1 + M.c*d1*d1;
+        const tt=clamp((Math.log(v+1e-6)-lmin)/lden,0,1);
+        const col=heatColor(tt); const idx=(py*rw+px)*4;
+        img.data[idx]=col[0]; img.data[idx+1]=col[1]; img.data[idx+2]=col[2]; img.data[idx+3]=255;
+      }
+    }
+    octx.putImageData(img,0,0);
+    const eg=eig2(M.a,M.b,M.c); const levels=[]; const span=vmax-cmin;
+    for(let i=1;i<=7;i++){ levels.push(cmin + span*Math.pow(i/8,2)); }
+    cache={b,T,off,cmin,vmax,eg,levels};
+  }
+  function drawSurf(){
+    if(!cache)buildCache();
+    const b=cache.b,T=cache.T,eg=cache.eg,levels=cache.levels,cmin=cache.cmin;
+    sctx.clearRect(0,0,440,400);
+    sctx.fillStyle='#fff'; sctx.fillRect(0,0,440,400);
+    sctx.drawImage(cache.off,T.L,T.T);
+    sctx.save();
+    sctx.beginPath(); sctx.rect(T.L,T.T,T.R-T.L,T.B-T.T); sctx.clip();
+    sctx.lineWidth=1; sctx.strokeStyle='rgba(255,255,255,.5)';
+    if(eg.l2>1e-9){
+      for(let li=0;li<levels.length;li++){
+        const k=levels[li]-cmin; if(k<=0)continue;
+        const a1=Math.sqrt(k/eg.l1), a2=Math.sqrt(k/eg.l2);
+        sctx.beginPath();
+        for(let a=0;a<=64;a++){
+          const ph=a/64*2*Math.PI;
+          const v0=Math.cos(ph)*a1*eg.v1[0]+Math.sin(ph)*a2*eg.v2[0];
+          const v1=Math.cos(ph)*a1*eg.v1[1]+Math.sin(ph)*a2*eg.v2[1];
+          const X=T.sx(b.opt.t0+v0), Y=T.sy(b.opt.t1+v1);
+          if(a===0)sctx.moveTo(X,Y); else sctx.lineTo(X,Y);
+        }
+        sctx.closePath(); sctx.stroke();
+      }
+    }
+    if(state&&state.path.length){
+      sctx.strokeStyle='#111'; sctx.lineWidth=2; sctx.beginPath();
+      for(let i=0;i<state.path.length;i++){const q=state.path[i];const X=T.sx(q.t0),Y=T.sy(q.t1); if(i===0)sctx.moveTo(X,Y); else sctx.lineTo(X,Y);}
+      sctx.stroke();
+      for(let i=0;i<state.path.length;i++){const q=state.path[i];sctx.beginPath();sctx.arc(T.sx(q.t0),T.sy(q.t1),2.2,0,7);sctx.fillStyle='rgba(17,17,17,.8)';sctx.fill();}
+    }
+    sctx.restore();
+    sctx.beginPath(); sctx.arc(T.sx(b.opt.t0),T.sy(b.opt.t1),7,0,7); sctx.fillStyle='#22c55e'; sctx.fill(); sctx.lineWidth=2; sctx.strokeStyle='#fff'; sctx.stroke();
+    if(state){const cur=state.path[state.path.length-1]||{t0:state.t0,t1:state.t1};
+      const X=clamp(T.sx(cur.t0),T.L,T.R), Y=clamp(T.sy(cur.t1),T.T,T.B);
+      sctx.beginPath(); sctx.arc(X,Y,6,0,7); sctx.fillStyle='#ef4444'; sctx.fill(); sctx.lineWidth=2; sctx.strokeStyle='#fff'; sctx.stroke();
+    }
+    sctx.fillStyle='#5a6688'; sctx.font='bold 11px sans-serif';
+    sctx.textAlign='center'; sctx.textBaseline='top'; sctx.fillText('θ₀',(T.L+T.R)/2,T.B+18);
+    sctx.save(); sctx.translate(14,(T.T+T.B)/2); sctx.rotate(-Math.PI/2); sctx.textAlign='center'; sctx.textBaseline='bottom'; sctx.fillText('θ₁',0,0); sctx.restore();
+  }
+  function drawChart(){
+    cctx.clearRect(0,0,300,400);
+    const hist=state?state.hist:[];
+    let ymax=1; for(let i=0;i<hist.length;i++)if(isFinite(hist[i])&&hist[i]>ymax)ymax=hist[i];
+    if(!isFinite(ymax)||ymax<=0)ymax=1; if(cache)ymax=Math.min(ymax,cache.vmax*3);
+    const T=plotTf(300,400,{l:48,r:12,t:14,b:34},0,Math.max(1,hist.length-1),0,ymax*1.08);
+    drawAxes(cctx,T,{nx:5,ny:5,xd:0,yd:ymax>50?0:1,xlab:'iteration',ylab:'MSE'});
+    if(hist.length>0){
+      cctx.strokeStyle='#7c3aed'; cctx.lineWidth=2.5; cctx.beginPath(); let started=false;
+      for(let i=0;i<hist.length;i++){const v=hist[i]; if(!isFinite(v))continue; const X=T.sx(i),Y=T.sy(clamp(v,0,ymax*1.08)); if(!started){cctx.moveTo(X,Y);started=true;}else cctx.lineTo(X,Y);}
+      cctx.stroke();
+      const last=hist[hist.length-1];
+      if(isFinite(last)){cctx.beginPath();cctx.arc(T.sx(hist.length-1),T.sy(clamp(last,0,ymax*1.08)),4,0,7);cctx.fillStyle='#ef4444';cctx.fill();}
+    } else {
+      cctx.fillStyle='#8892b0'; cctx.font='12px sans-serif'; cctx.textAlign='center'; cctx.fillText('לחצו “הרץ” או “צעד יחיד”',150,200);
+    }
+  }
+  function reset(keepStart){
+    stop();
+    const b=cache?cache.b:bounds();
+    let s;
+    if(keepStart && state){ s={t0:state.startT0,t1:state.startT1}; }
+    else { s={t0:b.opt.t0 - (b.t0max-b.t0min)*0.36, t1:b.opt.t1 + (b.t1max-b.t1min)*0.40}; }
+    state={t0:s.t0,t1:s.t1,startT0:s.t0,startT1:s.t1,iter:0,hist:[cost(s.t0,s.t1)],path:[{t0:s.t0,t1:s.t1}],diverged:false,converged:false};
+    setStatus('idle','מוכן'); update();
+  }
+  function step(){
+    if(!state||state.diverged||state.converged)return;
+    const a=+slA.value; const g=grad(state.t0,state.t1);
+    state.t0-=a*g[0]; state.t1-=a*g[1]; state.iter++;
+    const c=cost(state.t0,state.t1);
+    state.hist.push(c); state.path.push({t0:state.t0,t1:state.t1});
+    const gn=Math.hypot(g[0],g[1]);
+    if(!isFinite(c)||c>1e9||Math.abs(state.t0)>1e6||Math.abs(state.t1)>1e6){state.diverged=true;stop();setStatus('warn','מתבדר! ✕ (α גדול מדי)');}
+    else if(gn<1e-4){state.converged=true;stop();setStatus('ok','התכנס ✓');}
+    else if(state.iter>=8000){stop();setStatus('idle','הגיע למקסימום איטרציות');}
+  }
+  function loop(){ if(!state||state.diverged||state.converged){stop();return;} step(); update(); }
+  function play(){ if(timer)return; if(!state)reset(false); if(state.diverged||state.converged)reset(true);
+    setStatus('run','רץ…'); document.getElementById('g_play').textContent='⏸ עצור'; timer=setInterval(loop,90); }
+  function stop(){ if(timer){clearInterval(timer);timer=null;} document.getElementById('g_play').textContent='▶ הרץ'; }
+  function setStatus(cls,txt){const el=document.getElementById('g_status');el.className='status '+cls;el.textContent=txt;
+    const cn=document.getElementById('g_chartnote');
+    if(cls==='warn'){cn.textContent='התבדרות — העלות מתפוצצת (α גבוה מדי)';cn.style.color='#b91c1c';}
+    else if(cls==='ok'){cn.textContent='התכנסות — העלות ירדה והתייצבה';cn.style.color='#15803d';}
+    else {cn.textContent='עלות לעומת איטרציה';cn.style.color='';}
+  }
+  function update(){
+    drawSurf(); drawChart();
+    document.getElementById('g_iter').textContent=state?state.iter:0;
+    const c=state?state.hist[state.hist.length-1]:NaN;
+    document.getElementById('g_cost').textContent=isFinite(c)?fmt(c,3):'∞';
+    document.getElementById('g_t0').textContent=state?fmt(state.t0,2):'—';
+    document.getElementById('g_t1').textContent=state?fmt(state.t1,3):'—';
+  }
+  function refreshCrit(){ critEl.innerHTML='קצב קריטי משוער ≈ <b dir="ltr">'+fmt(alphaCrit(),3)+'</b> — מעליו GD מתבדר'; }
+  slA.addEventListener('input',()=>{avEl.textContent=fmt(+slA.value,3);});
+  document.getElementById('g_play').addEventListener('click',()=>{ if(timer)stop(); else play(); });
+  document.getElementById('g_step').addEventListener('click',()=>{ if(!state)reset(false); if(state.converged||state.diverged)reset(true); step(); update(); });
+  document.getElementById('g_reset').addEventListener('click',()=>{reset(false);});
+  document.getElementById('g_data').addEventListener('click',()=>{DATA=genData((Math.random()*1e6)|0);onDataChanged();});
+  surf.addEventListener('pointerdown',e=>{
+    stop(); if(!cache)buildCache(); const p=relPos(surf,e); const T=cache.T;
+    const t0=clamp(T.ix(p.x),cache.b.t0min,cache.b.t0max), t1=clamp(T.iy(p.y),cache.b.t1min,cache.b.t1max);
+    state={t0:t0,t1:t1,startT0:t0,startT1:t1,iter:0,hist:[cost(t0,t1)],path:[{t0:t0,t1:t1}],diverged:false,converged:false};
+    setStatus('idle','נקודת התחלה נבחרה'); update();
+  });
+  function rebuild(){ cache=null; buildCache(); refreshCrit();
+    const ac=alphaCrit(); slA.max=(Math.max(0.02,ac*1.7)).toFixed(4); slA.step=(+slA.max/200).toFixed(5);
+    if(+slA.value>+slA.max)slA.value=slA.max; avEl.textContent=fmt(+slA.value,3); reset(false);
+  }
+  return {rebuild,onShow:function(){ if(!cache)rebuild(); update(); }};
+})();
+
+/* ========================= TAB 3 : OLS vs GD ========================= */
+const T3=(function(){
+  const fit=document.getElementById('c_fit'); const fctx=setupCanvas(fit,360,320);
+  const conv=document.getElementById('c_conv'); const vctx=setupCanvas(conv,300,320);
+  const slA=document.getElementById('c_a'), avEl=document.getElementById('c_av');
+  const slM=document.getElementById('c_m'), mvEl=document.getElementById('c_mv');
+  const slT=document.getElementById('c_t'), tvEl=document.getElementById('c_tv');
+  let last=null;
+  function runGD(alpha,maxit,tol){
+    const o=olsFit(); let t0=o.t0-6, t1=o.t1+1.3;
+    const hist=[cost(t0,t1)]; let it=0, diverged=false;
+    for(it=1;it<=maxit;it++){
+      const g=grad(t0,t1); const gn=Math.hypot(g[0],g[1]);
+      if(gn<tol){break;}
+      t0-=alpha*g[0]; t1-=alpha*g[1];
+      const c=cost(t0,t1); hist.push(c);
+      if(!isFinite(c)||c>1e12||Math.abs(t0)>1e7){diverged=true;break;}
+    }
+    return {t0:t0,t1:t1,it:it,hist:hist,diverged:diverged};
+  }
+  function drawFit(gd){
+    fctx.clearRect(0,0,360,320);
+    const T=plotTf(360,320,{l:40,r:12,t:12,b:30},VIEW.xmin,VIEW.xmax,VIEW.ymin,VIEW.ymax);
+    drawAxes(fctx,T,{nx:5,ny:5,xd:0,yd:0,xlab:'x',ylab:'y'});
+    for(let i=0;i<DATA.length;i++){const p=DATA[i];fctx.beginPath();fctx.arc(T.sx(p.x),T.sy(p.y),4,0,7);fctx.fillStyle='#6366f1';fctx.fill();}
+    const o=olsFit();
+    fctx.strokeStyle='#16a34a'; fctx.lineWidth=3.5; fctx.beginPath();
+    fctx.moveTo(T.sx(VIEW.xmin),T.sy(o.t0+o.t1*VIEW.xmin)); fctx.lineTo(T.sx(VIEW.xmax),T.sy(o.t0+o.t1*VIEW.xmax)); fctx.stroke();
+    if(gd&&!gd.diverged){
+      fctx.strokeStyle='#ec4899'; fctx.lineWidth=2; fctx.setLineDash([7,5]); fctx.beginPath();
+      fctx.moveTo(T.sx(VIEW.xmin),T.sy(gd.t0+gd.t1*VIEW.xmin)); fctx.lineTo(T.sx(VIEW.xmax),T.sy(gd.t0+gd.t1*VIEW.xmax)); fctx.stroke();
+      fctx.setLineDash([]);
+    }
+  }
+  function drawConv(gd){
+    vctx.clearRect(0,0,300,320);
+    const hist=gd?gd.hist:[];
+    let lo=1e9,hi=-1e9; for(let i=0;i<hist.length;i++){if(isFinite(hist[i])&&hist[i]>0){lo=Math.min(lo,hist[i]);hi=Math.max(hi,hist[i]);}}
+    if(!isFinite(lo)||hist.length<2){vctx.fillStyle='#8892b0';vctx.font='12px sans-serif';vctx.textAlign='center';vctx.fillText('לחצו “הרץ השוואה”',150,160);return;}
+    const yl0=Math.log10(Math.max(lo,1e-9)), yl1=Math.log10(Math.max(hi,lo*1.0001)+1e-9);
+    const T=plotTf(300,320,{l:46,r:12,t:12,b:30},0,Math.max(1,hist.length-1),yl0,yl1);
+    vctx.strokeStyle='#c7cfe0'; vctx.lineWidth=1.2; vctx.strokeRect(T.L,T.T,T.R-T.L,T.B-T.T);
+    vctx.font='10px monospace'; vctx.textAlign='right'; vctx.textBaseline='middle';
+    for(let j=0;j<=4;j++){const lv=yl0+(yl1-yl0)*j/4;const py=T.sy(lv);
+      vctx.strokeStyle='#eef2fb';vctx.lineWidth=1;vctx.beginPath();vctx.moveTo(T.L,py);vctx.lineTo(T.R,py);vctx.stroke();
+      vctx.fillStyle='#8892b0';vctx.fillText('10^'+lv.toFixed(1),T.L-4,py);}
+    vctx.textAlign='center';vctx.textBaseline='top';
+    for(let i=0;i<=4;i++){const xv=(hist.length-1)*i/4;vctx.fillStyle='#8892b0';vctx.fillText(Math.round(xv),T.sx(xv),T.B+4);}
+    vctx.fillStyle='#5a6688';vctx.font='bold 11px sans-serif';vctx.fillText('iteration',(T.L+T.R)/2,T.B+16);
+    vctx.strokeStyle='#7c3aed'; vctx.lineWidth=2.5; vctx.beginPath(); let started=false;
+    for(let i=0;i<hist.length;i++){const v=hist[i];if(!isFinite(v)||v<=0)continue;const X=T.sx(i),Y=T.sy(clamp(Math.log10(v),yl0,yl1));if(!started){vctx.moveTo(X,Y);started=true;}else vctx.lineTo(X,Y);}
+    vctx.stroke();
+  }
+  function run(){
+    const alpha=+slA.value, maxit=+slM.value, tol=Math.pow(10,+slT.value);
+    const o=olsFit(); const om=cost(o.t0,o.t1);
+    const gd=runGD(alpha,maxit,tol); last=gd;
+    document.getElementById('c_o0').textContent=fmt(o.t0,4);
+    document.getElementById('c_o1').textContent=fmt(o.t1,4);
+    document.getElementById('c_omse').textContent=fmt(om,4);
+    document.getElementById('c_g0').textContent=fmt(gd.t0,4);
+    document.getElementById('c_g1').textContent=fmt(gd.t1,4);
+    document.getElementById('c_gmse').textContent=isFinite(cost(gd.t0,gd.t1))?fmt(cost(gd.t0,gd.t1),4):'∞';
+    document.getElementById('c_git').textContent=gd.it+(gd.diverged?' (התבדר)':'');
+    const dth=Math.hypot(gd.t0-o.t0,gd.t1-o.t1);
+    document.getElementById('c_dth').textContent=gd.diverged?'—':fmtSci(dth);
+    document.getElementById('c_dmse').textContent=gd.diverged?'—':('ΔMSE = '+fmtSci(cost(gd.t0,gd.t1)-om));
+    const el=document.getElementById('c_status');
+    if(gd.diverged){el.className='status warn';el.textContent='GD התבדר — הקטינו את α';}
+    else if(dth<1e-2){el.className='status ok';el.textContent='GD התכנס ל‑OLS ✓ ('+gd.it+' איטרציות)';}
+    else {el.className='status run';el.textContent='GD קרוב אך לא התכנס — הגדילו איטרציות/α';}
+    drawFit(gd); drawConv(gd);
+  }
+  slA.addEventListener('input',()=>avEl.textContent=fmt(+slA.value,3));
+  slM.addEventListener('input',()=>mvEl.textContent=slM.value);
+  slT.addEventListener('input',()=>tvEl.textContent=Math.pow(10,+slT.value).toExponential(0));
+  document.getElementById('c_run').addEventListener('click',run);
+  document.getElementById('c_data').addEventListener('click',()=>{DATA=genData((Math.random()*1e6)|0);onDataChanged();run();});
+  function rebuild(){ const ac=alphaCrit(); slA.max=(Math.max(0.02,ac*1.7)).toFixed(4); slA.step=(+slA.max/200).toFixed(5); if(+slA.value>+slA.max)slA.value=slA.max; avEl.textContent=fmt(+slA.value,3); }
+  return {rebuild,onShow:function(){ if(!last)run(); else {drawFit(last);drawConv(last);} }, run:run};
+})();
+
+/* ========================= TAB 4 : polynomial overfitting ========================= */
+const T4=(function(){
+  const fit=document.getElementById('p_fit'); const fctx=setupCanvas(fit,560,340);
+  const errc=document.getElementById('p_err'); const ectx=setupCanvas(errc,340,340);
+  const slD=document.getElementById('p_d'), dvEl=document.getElementById('p_dv');
+  const slN=document.getElementById('p_n'), nvEl=document.getElementById('p_nv');
+  const slK=document.getElementById('p_k'), kvEl=document.getElementById('p_kv');
+  const XMIN=0,XMAX=10;
+  let seed=101, train=[], test=[], errTrain=[], errTest=[], bestDeg=1;
+  function trueF(x){ return 5 + 2*Math.sin(0.9*x) + 0.28*x; }
+  function normX(x){ const mid=(XMIN+XMAX)/2, half=(XMAX-XMIN)/2||1; return (x-mid)/half; }
+  function gen(){
+    const rnd=mulberry32(seed); const sig=+slN.value; const k=+slK.value;
+    train=[]; for(let i=0;i<k;i++){const x=XMIN+rnd()*(XMAX-XMIN); const g=(rnd()*2-1)+(rnd()*2-1); train.push({x:x, y:trueF(x)+g*0.5*sig});}
+    train.sort((a,b)=>a.x-b.x);
+    test=[]; const m=50; for(let i=0;i<m;i++){const x=XMIN+(i+0.5)/m*(XMAX-XMIN); const g=(rnd()*2-1)+(rnd()*2-1); test.push({x:x, y:trueF(x)+g*0.5*sig});}
+    computeAll();
+  }
+  function solve(A,b){
+    const n=b.length; const M=A.map((r,i)=>r.slice().concat([b[i]]));
+    for(let col=0;col<n;col++){
+      let piv=col; for(let r=col+1;r<n;r++)if(Math.abs(M[r][col])>Math.abs(M[piv][col]))piv=r;
+      if(Math.abs(M[piv][col])<1e-14)continue;
+      const tmp=M[col];M[col]=M[piv];M[piv]=tmp;
+      const d=M[col][col];
+      for(let r=0;r<n;r++){ if(r===col)continue; const f=M[r][col]/d; for(let c=col;c<=n;c++)M[r][c]-=f*M[col][c]; }
+    }
+    const x=new Array(n).fill(0);
+    for(let i=0;i<n;i++){ const d=M[i][i]; x[i]=Math.abs(d)<1e-14?0:M[i][n]/d; }
+    return x;
+  }
+  function polyFit(pts,deg){
+    const ridge=1e-6; const n=pts.length; const d=deg;
+    const A=[]; for(let a=0;a<=d;a++)A.push(new Array(d+1).fill(0));
+    const bb=new Array(d+1).fill(0);
+    for(let i=0;i<n;i++){
+      const xn=normX(pts[i].x); const pw=new Array(d+1); pw[0]=1; for(let k=1;k<=d;k++)pw[k]=pw[k-1]*xn;
+      for(let a=0;a<=d;a++){ bb[a]+=pw[a]*pts[i].y; for(let c=0;c<=d;c++)A[a][c]+=pw[a]*pw[c]; }
+    }
+    for(let a=0;a<=d;a++)A[a][a]+=ridge;
+    return solve(A,bb);
+  }
+  function polyEval(coef,x){ const xn=normX(x); let v=0; for(let k=coef.length-1;k>=0;k--)v=v*xn+coef[k]; return v; }
+  function mseOn(pts,coef){ let s=0; for(let i=0;i<pts.length;i++){const e=polyEval(coef,pts[i].x)-pts[i].y; s+=e*e;} return pts.length?s/pts.length:0; }
+  function computeAll(){
+    errTrain=[]; errTest=[]; let best=1,bestv=1e18;
+    for(let d=1;d<=15;d++){
+      const c=polyFit(train,d);
+      const et=mseOn(train,c), ev=mseOn(test,c);
+      errTrain[d]=et; errTest[d]=ev;
+      if(isFinite(ev)&&ev<bestv){bestv=ev;best=d;}
+    }
+    bestDeg=best;
+  }
+  function drawFit(){
+    fctx.clearRect(0,0,560,340);
+    const ys=train.concat(test).map(p=>p.y);
+    let ymin=Math.min.apply(null,ys),ymax=Math.max.apply(null,ys);
+    const pad=(ymax-ymin)*0.25||1; ymin-=pad; ymax+=pad;
+    const T=plotTf(560,340,{l:42,r:14,t:14,b:32},XMIN,XMAX,ymin,ymax);
+    drawAxes(fctx,T,{nx:5,ny:5,xd:0,yd:1,xlab:'x',ylab:'y'});
+    fctx.strokeStyle='#94a3b8'; fctx.lineWidth=2; fctx.setLineDash([4,4]); fctx.beginPath();
+    for(let i=0;i<=200;i++){const x=XMIN+(XMAX-XMIN)*i/200;const X=T.sx(x),Y=T.sy(trueF(x));if(i===0)fctx.moveTo(X,Y);else fctx.lineTo(X,Y);}
+    fctx.stroke(); fctx.setLineDash([]);
+    const d=+slD.value; const coef=polyFit(train,d);
+    fctx.save(); fctx.beginPath(); fctx.rect(T.L,T.T,T.R-T.L,T.B-T.T); fctx.clip();
+    fctx.strokeStyle='#16a34a'; fctx.lineWidth=3; fctx.beginPath(); let started=false;
+    for(let i=0;i<=400;i++){const x=XMIN+(XMAX-XMIN)*i/400;const yv=polyEval(coef,x);const X=T.sx(x),Y=T.sy(yv);
+      if(!isFinite(Y)){started=false;continue;} if(!started){fctx.moveTo(X,Y);started=true;}else fctx.lineTo(X,Y);}
+    fctx.stroke(); fctx.restore();
+    for(let i=0;i<test.length;i++){const p=test[i];fctx.beginPath();fctx.arc(T.sx(p.x),T.sy(p.y),3.2,0,7);fctx.strokeStyle='#ec4899';fctx.lineWidth=1.6;fctx.stroke();}
+    for(let i=0;i<train.length;i++){const p=train[i];fctx.beginPath();fctx.arc(T.sx(p.x),T.sy(p.y),4.5,0,7);fctx.fillStyle='#6366f1';fctx.fill();fctx.lineWidth=1.5;fctx.strokeStyle='#fff';fctx.stroke();}
+    document.getElementById('p_tr').textContent=fmt(errTrain[d],3);
+    document.getElementById('p_te').textContent=fmt(errTest[d],3);
+    document.getElementById('p_best').textContent=bestDeg;
+  }
+  function drawErr(){
+    ectx.clearRect(0,0,340,340);
+    let hi=0; for(let d=1;d<=15;d++){hi=Math.max(hi,errTrain[d]||0,Math.min(errTest[d]||0,1e6));}
+    const sorted=[]; for(let d=1;d<=15;d++)sorted.push(errTest[d]);
+    sorted.sort((a,b)=>a-b); const med=sorted[Math.floor(sorted.length/2)]||1;
+    let cap=Math.max(med*6, (errTest[bestDeg]||1)*8, hi*0.4); if(!isFinite(cap)||cap<=0)cap=1;
+    const T=plotTf(340,340,{l:46,r:12,t:14,b:44},1,15,0,cap*1.05);
+    drawAxes(ectx,T,{nx:7,ny:5,xd:0,yd:cap>20?0:1,xlab:'degree',ylab:'MSE'});
+    function series(arr,color){
+      ectx.strokeStyle=color; ectx.lineWidth=2.5; ectx.beginPath();
+      for(let d=1;d<=15;d++){const v=clamp(arr[d],0,cap*1.05);const X=T.sx(d),Y=T.sy(v);if(d===1)ectx.moveTo(X,Y);else ectx.lineTo(X,Y);}
+      ectx.stroke();
+      for(let d=1;d<=15;d++){const v=clamp(arr[d],0,cap*1.05);ectx.beginPath();ectx.arc(T.sx(d),T.sy(v),2.6,0,7);ectx.fillStyle=color;ectx.fill();}
+    }
+    series(errTrain,'#3b82f6'); series(errTest,'#ef4444');
+    ectx.strokeStyle='rgba(22,163,74,.7)'; ectx.lineWidth=1.5; ectx.setLineDash([5,4]);
+    ectx.beginPath(); ectx.moveTo(T.sx(bestDeg),T.T); ectx.lineTo(T.sx(bestDeg),T.B); ectx.stroke(); ectx.setLineDash([]);
+    const cd=+slD.value;
+    ectx.strokeStyle='rgba(124,58,237,.9)'; ectx.lineWidth=2;
+    ectx.beginPath(); ectx.moveTo(T.sx(cd),T.T); ectx.lineTo(T.sx(cd),T.B); ectx.stroke();
+    ectx.fillStyle='#7c3aed'; ectx.font='bold 10px sans-serif'; ectx.textAlign='center'; ectx.textBaseline='top';
+    ectx.fillText('נוכחי',T.sx(cd),T.T+2);
+  }
+  function redraw(){ drawFit(); drawErr(); }
+  slD.addEventListener('input',()=>{dvEl.textContent=slD.value;redraw();});
+  slN.addEventListener('input',()=>{nvEl.textContent=fmt(+slN.value,1);gen();redraw();});
+  slK.addEventListener('input',()=>{kvEl.textContent=slK.value;gen();redraw();});
+  document.getElementById('p_regen').addEventListener('click',()=>{seed=(Math.random()*1e6)|0;gen();redraw();});
+  gen();
+  return {onShow:redraw};
+})();
+
+/* ========================= data-change propagation ========================= */
+function onDataChanged(){
+  T1.draw(); T2.rebuild(); T3.rebuild();
+  if(document.querySelector('.tabpane[data-pane="cmp"]').classList.contains('active')) T3.run();
+  if(document.querySelector('.tabpane[data-pane="gd"]').classList.contains('active')) T2.onShow();
+}
+
+/* ========================= tab switching ========================= */
+const tabs=document.querySelectorAll('.tab'), panes=document.querySelectorAll('.tabpane');
+const onShow={fit:function(){T1.draw();}, gd:function(){T2.onShow();}, cmp:function(){T3.onShow();}, poly:function(){T4.onShow();}};
+tabs.forEach(function(t){t.addEventListener('click',function(){
+  const name=t.dataset.tab;
+  tabs.forEach(function(x){x.classList.remove('active');}); t.classList.add('active');
+  panes.forEach(function(p){p.classList.toggle('active',p.dataset.pane===name);});
+  if(onShow[name])onShow[name]();
+});});
+
+/* ========================= init ========================= */
+T1.draw();
+T2.rebuild();
+T3.rebuild();
+</script>
+</body>
+</html>

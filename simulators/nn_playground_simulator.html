@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>סימולטור: מגרש משחקים לרשתות נוירונים</title>
+<style>
+/* ===== Shared theme kit for ML-course simulators & interactive labs =====
+   Inline this verbatim inside a <style> block so the file stays self-contained.
+   Matches the upgraded tutorials (indigo/violet, light cards, RTL). Add your own
+   component CSS below it as needed. */
+:root{
+  --primary:#6366f1; --primary-600:#4f46e5; --secondary:#7c3aed; --secondary-600:#6d28d9;
+  --accent:#ec4899; --info:#3b82f6; --success:#16a34a; --success-500:#22c55e;
+  --warning:#ef4444; --amber:#f59e0b; --ink:#263056; --muted:#5a6688;
+  --surface:#fff; --surface-2:#f6f8fd; --surface-3:#eef2fb; --line:#e4e9f5; --line-2:#d7deee;
+  --grad:linear-gradient(135deg,var(--primary),var(--secondary));
+  --grad-soft:linear-gradient(135deg,#eef2ff,#f5edff);
+  --r-sm:8px; --r-md:14px; --r-lg:20px; --r-pill:999px;
+  --sh-sm:0 2px 6px rgba(30,36,64,.07); --sh-md:0 8px 24px rgba(30,36,64,.10); --sh-lg:0 16px 44px rgba(30,36,64,.16);
+  --font:"Segoe UI","Assistant","Heebo","Rubik","Noto Sans Hebrew",Tahoma,Arial,sans-serif;
+  --mono:"JetBrains Mono","Fira Code","Consolas","Courier New",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);color:var(--ink);line-height:1.7;min-height:100vh;
+  background:linear-gradient(135deg,#6366f1 0%,#7c3aed 55%,#9333ea 100%) fixed;-webkit-font-smoothing:antialiased}
+.sim-wrap{max-width:1180px;margin:0 auto;padding:1.6rem}
+header,.sim-header{position:relative;overflow:hidden;background:var(--surface);border-radius:var(--r-lg);
+  padding:1.8rem 2rem;margin-bottom:1.2rem;box-shadow:var(--sh-lg);text-align:center}
+header::before,.sim-header::before{content:"";position:absolute;inset-inline:0;top:0;height:6px;
+  background:linear-gradient(90deg,var(--primary),var(--secondary),var(--accent))}
+h1{font-size:clamp(1.5rem,3.4vw,2.2rem);font-weight:800;letter-spacing:-.01em;line-height:1.2;
+  background:linear-gradient(120deg,var(--primary-600),var(--secondary),var(--accent));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle,header p{color:var(--muted);font-size:1.05rem;margin-top:.4rem}
+h2{color:var(--primary-600);font-size:1.3rem;font-weight:800;margin:.2rem 0 .8rem}
+h3{color:var(--secondary-600);font-size:1.1rem;font-weight:700;margin:.6rem 0 .4rem}
+
+/* tabs */
+.tabs{display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center;background:rgba(255,255,255,.85);
+  backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:var(--r-pill);
+  padding:.5rem;margin-bottom:1.2rem;box-shadow:var(--sh-sm);position:sticky;top:.5rem;z-index:50}
+.tab{padding:.5rem 1.1rem;border-radius:var(--r-pill);cursor:pointer;font-weight:600;font-size:.92rem;
+  color:var(--muted);border:1px solid transparent;background:none;font-family:inherit;transition:all .2s}
+.tab:hover{background:var(--surface-3);color:var(--primary-600)}
+.tab.active{background:var(--grad);color:#fff;box-shadow:var(--sh-sm)}
+.tabpane{display:none;animation:fade .4s ease}
+.tabpane.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* panels / cards */
+.panel,.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:1.4rem;margin-bottom:1.2rem;box-shadow:var(--sh-md)}
+.panel-grid{display:grid;grid-template-columns:320px 1fr;gap:1.2rem;align-items:start}
+@media(max-width:820px){.panel-grid{grid-template-columns:1fr}}
+
+/* controls */
+.controls{display:flex;flex-direction:column;gap:1rem}
+.control label{display:flex;justify-content:space-between;font-weight:600;font-size:.9rem;margin-bottom:.35rem}
+.control label .val{color:var(--secondary-600);font-family:var(--mono);background:var(--surface-3);
+  padding:.05rem .5rem;border-radius:var(--r-pill)}
+input[type=range]{width:100%;height:8px;border-radius:var(--r-pill);background:var(--surface-3);
+  outline:none;-webkit-appearance:none;appearance:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+  background:var(--grad);cursor:pointer;border:2px solid #fff;box-shadow:var(--sh-sm)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--secondary);
+  cursor:pointer;border:2px solid #fff}
+select,input[type=number]{font-family:inherit;padding:.45rem .7rem;border:1px solid var(--line-2);
+  border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font-size:.9rem}
+.btn,.btn2{padding:.6rem 1.2rem;border:none;border-radius:var(--r-pill);font-weight:700;cursor:pointer;
+  font-family:inherit;font-size:.92rem;transition:transform .15s,box-shadow .15s;display:inline-flex;align-items:center;gap:.4rem}
+.btn{background:var(--grad);color:#fff;box-shadow:var(--sh-sm)}
+.btn:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
+.btn2{background:var(--surface);color:var(--primary-600);border:2px solid var(--primary)}
+.btn2:hover{background:var(--primary);color:#fff}
+.btnrow{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
+.seg{display:inline-flex;background:var(--surface-3);border-radius:var(--r-pill);padding:.2rem}
+.seg button{border:none;background:none;padding:.4rem .9rem;border-radius:var(--r-pill);cursor:pointer;
+  font-family:inherit;font-weight:600;font-size:.85rem;color:var(--muted)}
+.seg button.active{background:var(--grad);color:#fff}
+
+/* canvas / viz */
+canvas{max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);
+  box-shadow:var(--sh-sm);display:block}
+.viz{display:flex;flex-direction:column;gap:1rem;align-items:center}
+
+/* stat readouts */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.8rem;margin:.4rem 0}
+.stat{background:var(--grad-soft);border:1px solid var(--line);border-radius:var(--r-md);padding:.8rem;text-align:center}
+.stat .k{font-size:.78rem;color:var(--muted);font-weight:600}
+.stat .v{font-size:1.5rem;font-weight:800;color:var(--secondary-600);font-family:var(--mono)}
+
+/* notes / hints */
+.note,.hint{border-radius:var(--r-md);padding:1rem 1.2rem;margin:.8rem 0;border-inline-start:5px solid var(--info);
+  background:linear-gradient(135deg,#eff6ff,#e0efff)}
+.hint{border-inline-start-color:var(--amber);background:linear-gradient(135deg,#fffbeb,#fef3c7)}
+.note h3,.hint h3{margin-top:0}
+
+/* code / output */
+pre{background:#1e293b;color:#e2e8f0;padding:1.2rem;border-radius:var(--r-md);overflow-x:auto;
+  direction:ltr;text-align:left;font-family:var(--mono);font-size:.86rem;line-height:1.55;border:1px solid #2c3a52}
+code{font-family:var(--mono);background:var(--surface-3);color:#4338ca;padding:.1rem .4rem;border-radius:5px;font-size:.88em}
+.output{background:#0f172a;color:#c7f9cc;font-family:var(--mono);font-size:.82rem;padding:1rem 1.2rem;
+  border-radius:var(--r-md);overflow-x:auto;direction:ltr;text-align:left;white-space:pre;border:1px solid #14532d}
+
+/* tables */
+table{width:100%;border-collapse:collapse;margin:.6rem 0;border-radius:var(--r-md);overflow:hidden;box-shadow:var(--sh-sm)}
+th{background:var(--grad);color:#fff;padding:.6rem;font-weight:700}
+td{padding:.55rem;border-bottom:1px solid var(--line);text-align:center}
+tr:nth-child(even) td{background:var(--surface-2)}
+
+footer{color:#ede9fe;text-align:center;font-size:.85rem;padding:1.2rem;opacity:.9}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+/* ===== component CSS (page-specific) ===== */
+.canvas-row{display:flex;flex-wrap:wrap;gap:1rem;justify-content:center;width:100%}
+.canvas-box{display:flex;flex-direction:column;gap:.35rem;align-items:center}
+.canvas-box .cap{font-size:.8rem;color:var(--muted);font-weight:600;text-align:center}
+.legend{display:flex;gap:1.2rem;flex-wrap:wrap;justify-content:center;font-size:.82rem;color:var(--muted);margin-top:.2rem}
+.legend .dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:middle;margin-inline-end:.35rem;border:1.5px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.warn{border-inline-start-color:var(--warning)!important;background:linear-gradient(135deg,#fef2f2,#fee2e2)!important}
+.ok{border-inline-start-color:var(--success)!important;background:linear-gradient(135deg,#f0fdf4,#dcfce7)!important}
+.control .sub{font-size:.74rem;color:var(--muted);font-weight:500;margin-top:.2rem}
+.seg.wrap{flex-wrap:wrap}
+.kbd{font-family:var(--mono);background:var(--surface-3);color:var(--primary-600);padding:.05rem .45rem;border-radius:6px;font-size:.85em;font-weight:700}
+.formula{font-family:var(--mono);direction:ltr;text-align:center;background:var(--surface-3);border:1px solid var(--line);
+  border-radius:var(--r-md);padding:.7rem;font-size:1.02rem;color:var(--primary-600);font-weight:700;letter-spacing:.02em}
+.pill{display:inline-block;background:var(--surface-3);border-radius:var(--r-pill);padding:.1rem .6rem;font-family:var(--mono);color:var(--secondary-600);font-weight:700;font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="sim-wrap">
+  <header>
+    <h1>סימולטור: מגרש משחקים לרשתות נוירונים</h1>
+    <p class="subtitle">קורס עקרונות בלמידת מכונה · שבוע 9 · רשתות נוירונים ואימון מלא (Forward&nbsp;+&nbsp;Backpropagation) — נבנה מאפס ב-JavaScript</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="pg">מגרש משחקים</button>
+    <button class="tab" data-tab="ne">נוירון בודד / פרספטרון</button>
+    <button class="tab" data-tab="rg">קצב למידה ורגולריזציה</button>
+  </div>
+
+  <!-- ================= TAB 1: PLAYGROUND ================= -->
+  <section id="pg" class="tabpane active">
+    <div class="panel">
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control">
+            <label>צורת הנתונים</label>
+            <div class="seg wrap" id="pg-data">
+              <button data-v="blobs" class="active">שני אשכולות</button>
+              <button data-v="circle">מעגל</button>
+              <button data-v="xor">XOR</button>
+              <button data-v="spiral">ספירלה</button>
+            </div>
+          </div>
+          <div class="control">
+            <label>שכבות חבויות <span class="val" id="pg-nl-v">2</span></label>
+            <input type="range" id="pg-nl" min="0" max="4" step="1" value="2">
+            <div class="sub">0 = רגרסיה לוגיסטית (גבול ישר בלבד)</div>
+          </div>
+          <div class="control">
+            <label>נוירונים בכל שכבה <span class="val" id="pg-nh-v">6</span></label>
+            <input type="range" id="pg-nh" min="1" max="8" step="1" value="6">
+          </div>
+          <div class="control">
+            <label>פונקציית אקטיבציה</label>
+            <select id="pg-act">
+              <option value="tanh">tanh</option>
+              <option value="relu">ReLU</option>
+              <option value="sigmoid">sigmoid</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>קצב למידה η <span class="val" id="pg-lr-v">0.30</span></label>
+            <input type="range" id="pg-lr" min="-3" max="0.5" step="0.05" value="-0.52">
+          </div>
+          <div class="control">
+            <label>רעש בנתונים <span class="val" id="pg-noise-v">0.10</span></label>
+            <input type="range" id="pg-noise" min="0" max="0.35" step="0.01" value="0.10">
+          </div>
+          <div class="control">
+            <label>מהירות אימון (epochs/frame) <span class="val" id="pg-spd-v">3</span></label>
+            <input type="range" id="pg-spd" min="1" max="15" step="1" value="3">
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="pg-play">▶ אמן</button>
+            <button class="btn2" id="pg-step">⏭ צעד</button>
+            <button class="btn2" id="pg-reset">↺ אפס</button>
+          </div>
+        </div>
+
+        <div class="viz">
+          <div class="stat-grid" style="width:100%">
+            <div class="stat"><div class="k">epoch</div><div class="v" id="pg-epoch">0</div></div>
+            <div class="stat"><div class="k">Loss (cross-entropy)</div><div class="v" id="pg-loss">—</div></div>
+            <div class="stat"><div class="k">דיוק</div><div class="v" id="pg-acc">—</div></div>
+            <div class="stat"><div class="k">η</div><div class="v" id="pg-lr2">0.30</div></div>
+          </div>
+          <div class="canvas-row">
+            <div class="canvas-box">
+              <div class="cap">גבול ההחלטה (Decision Boundary)</div>
+              <canvas id="pg-canvas" width="360" height="360"></canvas>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:1rem">
+              <div class="canvas-box">
+                <div class="cap">מבנה הרשת (עובי/צבע הקשת = משקל)</div>
+                <canvas id="pg-net" width="300" height="196"></canvas>
+              </div>
+              <div class="canvas-box">
+                <div class="cap">עקומת ה-Loss לאורך האימון</div>
+                <canvas id="pg-losscv" width="300" height="130"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="legend">
+            <span><span class="dot" style="background:#2563eb"></span>מחלקה 0</span>
+            <span><span class="dot" style="background:#ec4899"></span>מחלקה 1</span>
+            <span><span class="dot" style="background:#3b82f6"></span>אזור חזוי 0</span>
+            <span><span class="dot" style="background:#f8fafd;border-color:#d7deee"></span>אי-ודאות (p≈0.5)</span>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>מה קורה כאן?</h3>
+        רשת נוירונים מלאה (MLP) עם <b>Forward-pass</b> ו-<b>Backpropagation</b> אמיתיים ממומשת מאפס. הקלט הוא שתי הקואורדינטות
+        <code>(x₁, x₂)</code> בלבד. כל נוירון מחשב <code>z = Σ wᵢxᵢ + b</code> ואז מפעיל אקטיבציה לא-לינארית; שכבת הפלט משתמשת ב-<code>sigmoid</code>
+        ובאובדן <code>binary cross-entropy</code>. נסו: על <b>XOR</b>, <b>מעגל</b> ו<b>ספירלה</b> גבול ישר לא מספיק — צריך <b>שכבות חבויות</b> עם אקטיבציה
+        לא-לינארית ומספיק נוירונים. עם <b>0 שכבות חבויות</b> תקבלו גבול ישר בלבד (perceptron / logistic regression).
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 2: SINGLE NEURON ================= -->
+  <section id="ne" class="tabpane">
+    <div class="panel">
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="formula">y = f( w₁·x₁ + w₂·x₂ + b )</div>
+          <div class="control">
+            <label>משקל w₁ <span class="val" id="ne-w1-v">1.20</span></label>
+            <input type="range" id="ne-w1" min="-4" max="4" step="0.05" value="1.2">
+          </div>
+          <div class="control">
+            <label>משקל w₂ <span class="val" id="ne-w2-v">1.20</span></label>
+            <input type="range" id="ne-w2" min="-4" max="4" step="0.05" value="1.2">
+          </div>
+          <div class="control">
+            <label>הטיה b (bias) <span class="val" id="ne-b-v">0.00</span></label>
+            <input type="range" id="ne-b" min="-4" max="4" step="0.05" value="0">
+          </div>
+          <div class="control">
+            <label>פונקציית אקטיבציה</label>
+            <select id="ne-act">
+              <option value="sigmoid">sigmoid</option>
+              <option value="tanh">tanh</option>
+              <option value="relu">ReLU</option>
+              <option value="step">step (perceptron קלאסי)</option>
+            </select>
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="ne-fit">🎯 התאם אוטומטית</button>
+            <button class="btn2" id="ne-newdata">נתונים חדשים</button>
+            <button class="btn2" id="ne-reset">↺ אפס</button>
+          </div>
+          <div class="hint" style="margin-top:.3rem">
+            <b>לחצו על הלוח</b> כדי למקם נקודת-בדיקה ולראות את <code>z</code> ואת הפלט <code>a=f(z)</code> שהנוירון מחשב עבורה.
+          </div>
+        </div>
+
+        <div class="viz">
+          <div class="stat-grid" style="width:100%">
+            <div class="stat"><div class="k">z של נקודת-בדיקה</div><div class="v" id="ne-z">—</div></div>
+            <div class="stat"><div class="k">a = f(z)</div><div class="v" id="ne-a">—</div></div>
+            <div class="stat"><div class="k">סיווג הנקודה</div><div class="v" id="ne-cls">—</div></div>
+            <div class="stat"><div class="k">דיוק על הנתונים</div><div class="v" id="ne-acc">—</div></div>
+          </div>
+          <div class="canvas-row">
+            <div class="canvas-box">
+              <div class="cap">מישור הקלט + הגבול הלינארי (z=0)</div>
+              <canvas id="ne-canvas" width="360" height="360"></canvas>
+            </div>
+            <div class="canvas-box">
+              <div class="cap">פונקציית האקטיבציה a=f(z)</div>
+              <canvas id="ne-actcv" width="300" height="220"></canvas>
+            </div>
+          </div>
+          <div class="legend">
+            <span><span class="dot" style="background:#2563eb"></span>מחלקה 0</span>
+            <span><span class="dot" style="background:#ec4899"></span>מחלקה 1</span>
+            <span><span class="dot" style="background:#111827"></span>נקודת-בדיקה</span>
+            <span>הקו הלבן = גבול ההחלטה <span class="kbd">w·x + b = 0</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        <h3>נוירון בודד = פרספטרון</h3>
+        הנוירון מגדיר <b>גבול לינארי</b> אחד במישור: הישר <code>w₁x₁ + w₂x₂ + b = 0</code>. הווקטור <code>(w₁, w₂)</code> ניצב לגבול ומצביע לכיוון
+        מחלקה 1; <code>b</code> מזיז את הגבול. פונקציית האקטיבציה קובעת <b>כיצד</b> ה-<code>z</code> ממופה לפלט: <code>step</code> נותנת החלטה חדה (0/1) כמו
+        פרספטרון קלאסי, ואילו <code>sigmoid</code> נותנת הסתברות רציפה וניתנת לגזירה (מה שמאפשר אימון ב-gradient descent). לחצו
+        <span class="kbd">🎯 התאם אוטומטית</span> כדי לראות gradient descent על נוירון בודד מוצא משקלים המפרידים את שני האשכולות.
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 3: LR & REGULARIZATION ================= -->
+  <section id="rg" class="tabpane">
+    <div class="panel">
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control">
+            <label>צורת הנתונים</label>
+            <div class="seg wrap" id="rg-data">
+              <button data-v="circle" class="active">מעגל</button>
+              <button data-v="xor">XOR</button>
+              <button data-v="spiral">ספירלה</button>
+              <button data-v="blobs">אשכולות</button>
+            </div>
+          </div>
+          <div class="control">
+            <label>קצב למידה η <span class="val" id="rg-lr-v">0.100</span></label>
+            <input type="range" id="rg-lr" min="-3" max="0.8" step="0.05" value="-1">
+            <div class="seg wrap" style="margin-top:.4rem" id="rg-lrpreset">
+              <button data-v="-3">איטי מדי</button>
+              <button data-v="-0.7" class="active">טוב</button>
+              <button data-v="0.6">מתבדר</button>
+            </div>
+          </div>
+          <div class="control">
+            <label>רגולריזציה L2 (λ) <span class="val" id="rg-l2-v">0.000</span></label>
+            <input type="range" id="rg-l2" min="0" max="0.08" step="0.002" value="0">
+          </div>
+          <div class="control">
+            <label>Dropout <span class="val" id="rg-do-v">0%</span></label>
+            <input type="range" id="rg-do" min="0" max="0.6" step="0.05" value="0">
+          </div>
+          <div class="control">
+            <label>רעש בנתונים <span class="val" id="rg-noise-v">0.25</span></label>
+            <input type="range" id="rg-noise" min="0" max="0.45" step="0.01" value="0.25">
+          </div>
+          <div class="control">
+            <label>נוירונים בכל שכבה (×2 שכבות) <span class="val" id="rg-nh-v">8</span></label>
+            <input type="range" id="rg-nh" min="2" max="14" step="1" value="8">
+            <div class="sub">רשת גדולה + רעש גבוה = overfitting</div>
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="rg-play">▶ אמן</button>
+            <button class="btn2" id="rg-step">⏭ צעד</button>
+            <button class="btn2" id="rg-reset">↺ אפס</button>
+          </div>
+        </div>
+
+        <div class="viz">
+          <div class="stat-grid" style="width:100%">
+            <div class="stat"><div class="k">epoch</div><div class="v" id="rg-epoch">0</div></div>
+            <div class="stat"><div class="k">Loss אימון</div><div class="v" id="rg-trl">—</div></div>
+            <div class="stat"><div class="k">Loss בדיקה</div><div class="v" id="rg-tel">—</div></div>
+            <div class="stat"><div class="k">פער הכללה</div><div class="v" id="rg-gap">—</div></div>
+          </div>
+          <div class="canvas-row">
+            <div class="canvas-box">
+              <div class="cap">גבול ההחלטה (● אימון · ◇ בדיקה)</div>
+              <canvas id="rg-canvas" width="360" height="360"></canvas>
+            </div>
+            <div class="canvas-box">
+              <div class="cap">Loss: אימון (מלא) מול בדיקה (מקווקו)</div>
+              <canvas id="rg-losscv" width="300" height="220"></canvas>
+            </div>
+          </div>
+          <div class="legend">
+            <span><span class="dot" style="background:#4f46e5"></span>Loss אימון</span>
+            <span><span class="dot" style="background:#ec4899"></span>Loss בדיקה</span>
+          </div>
+          <div id="rg-msg" class="note ok" style="width:100%">
+            <b>טיפ:</b> התחילו עם η=<span class="pill">טוב</span> וראו התכנסות חלקה. אחר-כך נסו <span class="pill">מתבדר</span> — ה-Loss יקפוץ ל-∞.
+            כדי לחוות <b>overfitting</b>: העלו רעש ונוירונים; ה-Loss באימון ירד אבל בבדיקה יעלה. הפעילו <b>L2</b> או <b>Dropout</b> וראו את הפער מצטמצם והגבול מתרכך.
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>קורס 6100034 · עקרונות בלמידת מכונה · ד״ר חן גלעדי · SCE אשדוד</footer>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Small-but-real MLP with backprop — built from scratch.
+   Binary classification, sigmoid output + cross-entropy loss.
+   ============================================================ */
+function randn(){ let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+
+function activate(kind,z){
+  if(kind==='relu') return z>0?z:0;
+  if(kind==='tanh') return Math.tanh(z);
+  if(kind==='step') return z>=0?1:0;
+  // sigmoid (numerically stable)
+  if(z>=0){ return 1/(1+Math.exp(-z)); }
+  const e=Math.exp(z); return e/(1+e);
+}
+function actDeriv(kind,z){
+  if(kind==='relu') return z>0?1:0;
+  if(kind==='tanh'){ const t=Math.tanh(z); return 1-t*t; }
+  const s=activate('sigmoid',z); return s*(1-s);
+}
+
+function makeNet(sizes,act){
+  const layers=[];
+  for(let l=0;l<sizes.length-1;l++){
+    const nIn=sizes[l], nOut=sizes[l+1];
+    const isOut=(l===sizes.length-2);
+    const kind=isOut?'sigmoid':act;
+    const scale=(kind==='relu')?Math.sqrt(2/nIn):Math.sqrt(1/nIn);
+    const W=[],b=[];
+    for(let j=0;j<nOut;j++){ const row=[]; for(let i=0;i<nIn;i++) row.push(randn()*scale); W.push(row); b.push(0); }
+    layers.push({W,b,nIn,nOut});
+  }
+  return {sizes:sizes.slice(),layers,act};
+}
+
+function forwardFull(net,x,dropout,training){
+  const L=net.layers.length; let a=x.slice();
+  const As=[a],Zs=[],masks=[];
+  for(let l=0;l<L;l++){
+    const ly=net.layers[l], isOut=(l===L-1);
+    const kind=isOut?'sigmoid':net.act;
+    const z=new Array(ly.nOut), an=new Array(ly.nOut);
+    for(let j=0;j<ly.nOut;j++){ let s=ly.b[j]; const wr=ly.W[j];
+      for(let i=0;i<ly.nIn;i++) s+=wr[i]*a[i]; z[j]=s; an[j]=activate(kind,s); }
+    let mask=null;
+    if(training && dropout>0 && !isOut){
+      mask=new Array(ly.nOut); const keep=1-dropout;
+      for(let j=0;j<ly.nOut;j++){ if(Math.random()<dropout){mask[j]=0;an[j]=0;} else {mask[j]=1/keep;an[j]*=mask[j];} }
+    }
+    Zs.push(z); masks.push(mask); As.push(an); a=an;
+  }
+  return {As,Zs,masks,out:a[0]};
+}
+function predict(net,x){ return forwardFull(net,x,0,false).out; }
+
+function trainBatch(net,batch,lr,l2,dropout){
+  const L=net.layers.length; const gW=[],gb=[];
+  for(let l=0;l<L;l++){ gW.push(net.layers[l].W.map(r=>r.map(()=>0))); gb.push(net.layers[l].b.map(()=>0)); }
+  const n=batch.length;
+  for(const s of batch){
+    const fp=forwardFull(net,s.x,dropout,true);
+    let p=fp.out; p=Math.min(1-1e-7,Math.max(1e-7,p));
+    let delta=[p-s.y];
+    for(let l=L-1;l>=0;l--){
+      const ly=net.layers[l]; const aPrev=fp.As[l];
+      for(let j=0;j<ly.nOut;j++){ const dj=delta[j]; gb[l][j]+=dj; const gwr=gW[l][j], wr=ly.W[j];
+        for(let i=0;i<ly.nIn;i++) gwr[i]+=dj*aPrev[i]; }
+      if(l>0){
+        const zPrev=fp.Zs[l-1], maskPrev=fp.masks[l-1], nPrev=ly.nIn, nd=new Array(nPrev).fill(0);
+        for(let i=0;i<nPrev;i++){ let s2=0; for(let j=0;j<ly.nOut;j++) s2+=delta[j]*ly.W[j][i];
+          let d=s2*actDeriv(net.act,zPrev[i]); if(maskPrev) d*=maskPrev[i]; nd[i]=d; }
+        delta=nd;
+      }
+    }
+  }
+  for(let l=0;l<L;l++){ const ly=net.layers[l];
+    for(let j=0;j<ly.nOut;j++){ ly.b[j]-=lr*(gb[l][j]/n); const wr=ly.W[j], gwr=gW[l][j];
+      for(let i=0;i<ly.nIn;i++) wr[i]-=lr*(gwr[i]/n + l2*wr[i]); } }
+}
+
+function epoch(net,data,lr,l2,dropout,batchSize){
+  const idx=[]; for(let i=0;i<data.length;i++) idx.push(i);
+  for(let i=idx.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; const t=idx[i]; idx[i]=idx[j]; idx[j]=t; }
+  for(let s=0;s<idx.length;s+=batchSize){
+    const batch=[]; const end=Math.min(s+batchSize,idx.length);
+    for(let k=s;k<end;k++) batch.push(data[idx[k]]);
+    trainBatch(net,batch,lr,l2,dropout);
+  }
+}
+function evalLoss(net,data){
+  let loss=0,correct=0;
+  for(const s of data){ let p=predict(net,s.x); const pc=Math.min(1-1e-7,Math.max(1e-7,p));
+    loss += -(s.y*Math.log(pc)+(1-s.y)*Math.log(1-pc));
+    if((p>0.5?1:0)===s.y) correct++; }
+  return {loss:loss/Math.max(1,data.length), acc:correct/Math.max(1,data.length)};
+}
+
+/* ---------- datasets (coords in [-1,1]) ---------- */
+function genData(kind,n,noise){
+  const d=[]; noise=noise||0; const jit=()=>(Math.random()*2-1)*noise;
+  if(kind==='blobs'){
+    for(let i=0;i<n;i++){ const c=i%2; const cx=c?0.5:-0.5, cy=c?0.5:-0.5;
+      d.push({x:[cx+randn()*0.16+jit(), cy+randn()*0.16+jit()], y:c}); }
+  } else if(kind==='circle'){
+    for(let i=0;i<n;i++){ const inner=i%2; const r=inner?Math.random()*0.35:0.55+Math.random()*0.42;
+      const t=Math.random()*2*Math.PI; d.push({x:[r*Math.cos(t)+jit(), r*Math.sin(t)+jit()], y:inner}); }
+  } else if(kind==='xor'){
+    for(let i=0;i<n;i++){ const x1=Math.random()*1.8-0.9, x2=Math.random()*1.8-0.9;
+      const y=(x1*x2>0)?1:0; d.push({x:[x1+jit(), x2+jit()], y}); }
+  } else { // spiral
+    const half=Math.max(1,(n/2)|0);
+    for(let c=0;c<2;c++){ for(let i=0;i<half;i++){ const r=i/half*0.97;
+      const t=1.75*(i/half)*2*Math.PI + c*Math.PI;
+      d.push({x:[r*Math.sin(t)+jit()*0.6, r*Math.cos(t)+jit()*0.6], y:c}); } }
+  }
+  return d;
+}
+
+/* ---------- shared rendering ---------- */
+function lerp(a,b,t){ return a+(b-a)*t; }
+function heatColor(p){
+  if(!isFinite(p)) p=0.5; p=Math.max(0,Math.min(1,p));
+  const c0=[37,99,235], cm=[247,249,253], c1=[236,72,153];
+  if(p<0.5){ const t=p/0.5; return [lerp(c0[0],cm[0],t),lerp(c0[1],cm[1],t),lerp(c0[2],cm[2],t)]; }
+  const t=(p-0.5)/0.5; return [lerp(cm[0],c1[0],t),lerp(cm[1],c1[1],t),lerp(cm[2],c1[2],t)];
+}
+function renderHeat(canvas,off,res,fn){
+  const ctx=canvas.getContext('2d'), W=canvas.width, H=canvas.height;
+  const octx=off.getContext('2d',{willReadFrequently:true});
+  const img=octx.createImageData(res,res);
+  for(let yy=0;yy<res;yy++){ for(let xx=0;xx<res;xx++){
+    const x=(xx+0.5)/res*2-1, y=1-(yy+0.5)/res*2;
+    const p=fn(x,y); const c=heatColor(p);
+    const o=(yy*res+xx)*4; img.data[o]=c[0]; img.data[o+1]=c[1]; img.data[o+2]=c[2]; img.data[o+3]=255;
+  }}
+  octx.putImageData(img,0,0);
+  ctx.imageSmoothingEnabled=true; ctx.clearRect(0,0,W,H);
+  ctx.drawImage(off,0,0,res,res,0,0,W,H);
+  // faint axes through origin
+  ctx.strokeStyle='rgba(38,48,86,.18)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,H); ctx.moveTo(0,H/2); ctx.lineTo(W,H/2); ctx.stroke();
+}
+function drawPoints(ctx,data,W,H,shapeByTest){
+  for(const s of data){
+    const px=Math.max(0,Math.min(W,(s.x[0]+1)/2*W));
+    const py=Math.max(0,Math.min(H,(1-s.x[1])/2*H));
+    ctx.beginPath();
+    if(shapeByTest && s.test){ // diamond for test points
+      const r=4.6; ctx.moveTo(px,py-r); ctx.lineTo(px+r,py); ctx.lineTo(px,py+r); ctx.lineTo(px-r,py); ctx.closePath();
+    } else {
+      ctx.arc(px,py,4.2,0,7);
+    }
+    ctx.fillStyle=s.y?'#ec4899':'#2563eb'; ctx.fill();
+    ctx.lineWidth=1.4; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.stroke();
+  }
+}
+function drawLoss(canvas,series){
+  const ctx=canvas.getContext('2d'), W=canvas.width, H=canvas.height, pad=8;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#fbfcff'; ctx.fillRect(0,0,W,H);
+  let mx=0; series.forEach(s=>s.data.forEach(v=>{ if(isFinite(v)&&v>mx)mx=v; }));
+  mx=Math.max(mx,0.05);
+  ctx.strokeStyle='rgba(38,48,86,.08)'; ctx.lineWidth=1;
+  for(let g=1;g<4;g++){ const y=pad+(g/4)*(H-2*pad); ctx.beginPath(); ctx.moveTo(pad,y); ctx.lineTo(W-pad,y); ctx.stroke(); }
+  series.forEach(s=>{
+    const d=s.data, n=d.length; if(n===0) return;
+    ctx.beginPath(); ctx.lineWidth=2.2; ctx.strokeStyle=s.color;
+    ctx.setLineDash(s.dash?[5,4]:[]);
+    for(let i=0;i<n;i++){ const x=pad+(n<=1?0:i/(n-1))*(W-2*pad);
+      const v=isFinite(d[i])?Math.min(d[i],mx):mx; const y=H-pad-(v/mx)*(H-2*pad);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  ctx.fillStyle='#5a6688'; ctx.font='11px monospace'; ctx.textAlign='right';
+  ctx.fillText(mx.toFixed(2), W-4, pad+11);
+  ctx.textAlign='left'; ctx.fillText('0', 4, H-4);
+}
+function drawNet(canvas,net){
+  const ctx=canvas.getContext('2d'), W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H); ctx.fillStyle='#fbfcff'; ctx.fillRect(0,0,W,H);
+  const sizes=net.sizes, cols=sizes.length, padX=30, padY=16;
+  const colX=l=> cols===1? W/2 : padX + l*(W-2*padX)/(cols-1);
+  const nodeY=(l,i)=>{ const n=sizes[l], gap=(H-2*padY)/n; return padY+gap*(i+0.5); };
+  for(let l=0;l<net.layers.length;l++){ const ly=net.layers[l];
+    for(let j=0;j<ly.nOut;j++){ for(let i=0;i<ly.nIn;i++){
+      const w=ly.W[j][i], mag=Math.min(1,Math.abs(w)/2.5); if(mag<0.02) continue;
+      ctx.beginPath(); ctx.moveTo(colX(l),nodeY(l,i)); ctx.lineTo(colX(l+1),nodeY(l+1,j));
+      ctx.strokeStyle=(w>=0)?'rgba(236,72,153,'+(0.12+0.72*mag)+')':'rgba(37,99,235,'+(0.12+0.72*mag)+')';
+      ctx.lineWidth=0.5+2.4*mag; ctx.stroke();
+    }}
+  }
+  for(let l=0;l<cols;l++){ for(let i=0;i<sizes[l];i++){
+    ctx.beginPath(); ctx.arc(colX(l),nodeY(l,i),6.5,0,7);
+    ctx.fillStyle= l===0?'#6366f1':(l===cols-1?'#7c3aed':'#a5b4fc');
+    ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.stroke();
+  }}
+  ctx.fillStyle='#5a6688'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('קלט', colX(0), H-3);
+  ctx.fillText('פלט', colX(cols-1), H-3);
+}
+
+/* ============================================================
+   TAB SWITCHING
+   ============================================================ */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click',()=>{
+    const id=t.dataset.tab;
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tabpane').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById(id).classList.add('active');
+    if(id!=='pg' && PG.running) PG.pause();
+    if(id!=='rg' && RG.running) RG.pause();
+    if(id==='ne') NE.render();
+    if(id==='rg') RG.render();
+    if(id==='pg') PG.render();
+  });
+});
+
+/* ============================================================
+   TAB 1 — PLAYGROUND
+   ============================================================ */
+const PG=(function(){
+  const $=id=>document.getElementById(id);
+  const cv=$('pg-canvas'), netcv=$('pg-net'), losscv=$('pg-losscv');
+  const off=document.createElement('canvas'); off.width=off.height=50; const RES=50;
+  let dataset='blobs', net=null, data=[], epochN=0, hist=[], running=false, req=null;
+
+  function cfg(){
+    return {
+      nl:+$('pg-nl').value, nh:+$('pg-nh').value, act:$('pg-act').value,
+      lr:Math.pow(10,+$('pg-lr').value), noise:+$('pg-noise').value, spd:+$('pg-spd').value
+    };
+  }
+  function build(){
+    const c=cfg(); const sizes=[2];
+    for(let i=0;i<c.nl;i++) sizes.push(c.nh);
+    sizes.push(1);
+    net=makeNet(sizes,c.act);
+    data=genData(dataset,200,c.noise);
+    epochN=0; hist=[];
+  }
+  function render(){
+    const c=cfg();
+    renderHeat(cv,off,RES,(x,y)=>predict(net,[x,y]));
+    drawPoints(cv.getContext('2d'),data,cv.width,cv.height,false);
+    drawNet(netcv,net);
+    drawLoss(losscv,[{data:hist,color:'#4f46e5',dash:false}]);
+    const e=evalLoss(net,data);
+    $('pg-epoch').textContent=epochN;
+    $('pg-loss').textContent=isFinite(e.loss)?e.loss.toFixed(3):'∞';
+    $('pg-acc').textContent=(e.acc*100).toFixed(0)+'%';
+    $('pg-lr2').textContent=c.lr.toFixed(c.lr<0.01?4:2);
+  }
+  function stepN(k){
+    const c=cfg();
+    for(let i=0;i<k;i++){ epoch(net,data,c.lr,0,0,10); epochN++; }
+    const e=evalLoss(net,data); hist.push(e.loss); if(hist.length>400) hist.shift();
+  }
+  function loop(){ if(!running) return; stepN(cfg().spd); render(); req=requestAnimationFrame(loop); }
+  function play(){ if(running) return; running=true; $('pg-play').textContent='⏸ השהה'; loop(); }
+  function pause(){ running=false; $('pg-play').textContent='▶ אמן'; if(req) cancelAnimationFrame(req); }
+  function reset(){ pause(); build(); render(); }
+
+  $('pg-data').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
+    $('pg-data').querySelectorAll('button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+    dataset=b.dataset.v; reset(); });
+  $('pg-nl').addEventListener('input',()=>{ $('pg-nl-v').textContent=$('pg-nl').value; reset(); });
+  $('pg-nh').addEventListener('input',()=>{ $('pg-nh-v').textContent=$('pg-nh').value; reset(); });
+  $('pg-act').addEventListener('change',reset);
+  $('pg-lr').addEventListener('input',()=>{ const lr=Math.pow(10,+$('pg-lr').value); $('pg-lr-v').textContent=lr.toFixed(lr<0.01?4:2); $('pg-lr2').textContent=lr.toFixed(lr<0.01?4:2); });
+  $('pg-noise').addEventListener('input',()=>{ $('pg-noise-v').textContent=(+$('pg-noise').value).toFixed(2); reset(); });
+  $('pg-spd').addEventListener('input',()=>{ $('pg-spd-v').textContent=$('pg-spd').value; });
+  $('pg-play').addEventListener('click',()=>{ running?pause():play(); });
+  $('pg-step').addEventListener('click',()=>{ if(running) pause(); stepN(1); render(); });
+  $('pg-reset').addEventListener('click',reset);
+
+  build(); render();
+  return {render,pause,get running(){return running;}};
+})();
+
+/* ============================================================
+   TAB 2 — SINGLE NEURON / PERCEPTRON
+   ============================================================ */
+const NE=(function(){
+  const $=id=>document.getElementById(id);
+  const cv=$('ne-canvas'), actcv=$('ne-actcv');
+  const off=document.createElement('canvas'); off.width=off.height=64; const RES=64;
+  let data=genData('blobs',120,0.10);
+  let query={x:0.35,y:0.35};
+
+  function W1(){return +$('ne-w1').value;} function W2(){return +$('ne-w2').value;}
+  function B(){return +$('ne-b').value;} function ACT(){return $('ne-act').value;}
+  function zAt(x,y){ return W1()*x+W2()*y+B(); }
+  function outAt(x,y){ return activate(ACT(),zAt(x,y)); }
+  // normalize activation output to [0,1] for heat coloring
+  function heatVal(x,y){ const a=outAt(x,y); const k=ACT();
+    if(k==='tanh') return (a+1)/2;
+    if(k==='relu') return 1/(1+Math.exp(-zAt(x,y))); // color relu region by z sign smoothly
+    return a; }
+
+  function drawBoundary(ctx,W,H){
+    const w1=W1(), w2=W2(), b=B(); ctx.lineWidth=2.5; ctx.strokeStyle='rgba(255,255,255,.95)';
+    ctx.beginPath();
+    if(Math.abs(w2)>=Math.abs(w1)){
+      for(let i=0;i<=1;i++){ const xd=i?1:-1; const yd=-(w1*xd+b)/(w2||1e-9);
+        const px=(xd+1)/2*W, py=(1-yd)/2*H; if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py); }
+    } else {
+      for(let i=0;i<=1;i++){ const yd=i?1:-1; const xd=-(w2*yd+b)/(w1||1e-9);
+        const px=(xd+1)/2*W, py=(1-yd)/2*H; if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py); }
+    }
+    ctx.stroke();
+  }
+  function drawActCurve(){
+    const ctx=actcv.getContext('2d'), W=actcv.width, H=actcv.height, pad=24;
+    ctx.clearRect(0,0,W,H); ctx.fillStyle='#fbfcff'; ctx.fillRect(0,0,W,H);
+    const k=ACT(); const zmin=-6, zmax=6;
+    const ymin=(k==='tanh')?-1.2:-0.2, ymax= (k==='relu')?5.2:1.2;
+    const X=z=> pad+(z-zmin)/(zmax-zmin)*(W-2*pad);
+    const Y=a=> H-pad-(a-ymin)/(ymax-ymin)*(H-2*pad);
+    ctx.strokeStyle='rgba(38,48,86,.18)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(X(0),pad-4); ctx.lineTo(X(0),H-pad+4);
+    ctx.moveTo(pad-4,Y(0)); ctx.lineTo(W-pad+4,Y(0)); ctx.stroke();
+    ctx.beginPath(); ctx.lineWidth=2.6; ctx.strokeStyle='#7c3aed'; let first=true;
+    for(let z=zmin;z<=zmax+1e-9;z+=0.06){ const a=activate(k,z);
+      if(k==='step' && Math.abs(z)<0.03){ ctx.stroke(); ctx.beginPath(); first=true; }
+      const px=X(z), py=Y(a); if(first){ctx.moveTo(px,py);first=false;} else ctx.lineTo(px,py); }
+    ctx.stroke();
+    const zq=zAt(query.x,query.y), aq=activate(k,zq);
+    const zc=Math.max(zmin,Math.min(zmax,zq));
+    ctx.beginPath(); ctx.arc(X(zc),Y(Math.max(ymin,Math.min(ymax,aq))),5,0,7); ctx.fillStyle='#111827'; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='#5a6688'; ctx.font='11px monospace'; ctx.textAlign='center';
+    ctx.fillText('z', W-pad+6, Y(0)-4); ctx.fillText('f(z)', X(0)+18, pad-2);
+  }
+  function render(){
+    renderHeat(cv,off,RES,(x,y)=>heatVal(x,y));
+    const ctx=cv.getContext('2d');
+    drawBoundary(ctx,cv.width,cv.height);
+    drawPoints(ctx,data,cv.width,cv.height,false);
+    const px=(query.x+1)/2*cv.width, py=(1-query.y)/2*cv.height;
+    ctx.beginPath(); ctx.arc(px,py,6,0,7); ctx.fillStyle='#111827'; ctx.fill();
+    ctx.lineWidth=2.5; ctx.strokeStyle='#fff'; ctx.stroke();
+    drawActCurve();
+    const z=zAt(query.x,query.y), a=activate(ACT(),z);
+    $('ne-z').textContent=z.toFixed(2);
+    $('ne-a').textContent=a.toFixed(3);
+    $('ne-cls').textContent=(z>=0?'1':'0');
+    let correct=0; for(const s of data){ const cl=(zAt(s.x[0],s.x[1])>=0)?1:0; if(cl===s.y) correct++; }
+    $('ne-acc').textContent=(correct/data.length*100).toFixed(0)+'%';
+    $('ne-w1-v').textContent=W1().toFixed(2); $('ne-w2-v').textContent=W2().toFixed(2); $('ne-b-v').textContent=B().toFixed(2);
+  }
+  // gradient descent on single neuron (logistic) to fit the blobs
+  let fitIv=null;
+  function fit(){
+    if(fitIv) clearInterval(fitIv);
+    let w1=W1(), w2=W2(), b=B(); const lr=0.6; let t=0;
+    fitIv=setInterval(()=>{
+      let gw1=0,gw2=0,gb=0;
+      for(const s of data){ const z=w1*s.x[0]+w2*s.x[1]+b; const p=activate('sigmoid',z);
+        const e=p-s.y; gw1+=e*s.x[0]; gw2+=e*s.x[1]; gb+=e; }
+      const n=data.length; w1-=lr*gw1/n; w2-=lr*gw2/n; b-=lr*gb/n;
+      $('ne-w1').value=Math.max(-4,Math.min(4,w1)); $('ne-w2').value=Math.max(-4,Math.min(4,w2)); $('ne-b').value=Math.max(-4,Math.min(4,b));
+      render();
+      if(++t>=70){ clearInterval(fitIv); fitIv=null; }
+    },30);
+  }
+  cv.addEventListener('click',ev=>{
+    const r=cv.getBoundingClientRect();
+    const sx=cv.width/r.width, sy=cv.height/r.height;
+    const px=(ev.clientX-r.left)*sx, py=(ev.clientY-r.top)*sy;
+    query={x:px/cv.width*2-1, y:1-py/cv.height*2}; render();
+  });
+  ['ne-w1','ne-w2','ne-b'].forEach(id=>$(id).addEventListener('input',render));
+  $('ne-act').addEventListener('change',render);
+  $('ne-fit').addEventListener('click',fit);
+  $('ne-newdata').addEventListener('click',()=>{ data=genData('blobs',120,0.10); render(); });
+  $('ne-reset').addEventListener('click',()=>{ if(fitIv){clearInterval(fitIv);fitIv=null;} $('ne-w1').value=1.2; $('ne-w2').value=1.2; $('ne-b').value=0; $('ne-act').value='sigmoid'; query={x:0.35,y:0.35}; render(); });
+
+  render();
+  return {render};
+})();
+
+/* ============================================================
+   TAB 3 — LEARNING RATE & REGULARIZATION
+   ============================================================ */
+const RG=(function(){
+  const $=id=>document.getElementById(id);
+  const cv=$('rg-canvas'), losscv=$('rg-losscv');
+  const off=document.createElement('canvas'); off.width=off.height=46; const RES=46;
+  let dataset='circle', net=null, train=[], test=[], epochN=0;
+  let htr=[], hte=[], running=false, req=null, diverged=false;
+
+  function cfg(){ return {
+    lr:Math.pow(10,+$('rg-lr').value), l2:+$('rg-l2').value, drop:+$('rg-do').value,
+    noise:+$('rg-noise').value, nh:+$('rg-nh').value
+  };}
+  function build(){
+    const c=cfg(); net=makeNet([2,c.nh,c.nh,1],'tanh');
+    train=genData(dataset,120,c.noise);
+    test=genData(dataset,120,c.noise); test.forEach(s=>s.test=true);
+    epochN=0; htr=[]; hte=[]; diverged=false;
+  }
+  function msg(txt,cls){ const m=$('rg-msg'); m.className='note '+cls; m.innerHTML=txt; }
+  function render(){
+    const c=cfg();
+    renderHeat(cv,off,RES,(x,y)=>predict(net,[x,y]));
+    const ctx=cv.getContext('2d');
+    drawPoints(ctx,train,cv.width,cv.height,false);
+    drawPoints(ctx,test,cv.width,cv.height,true);
+    drawLoss(losscv,[{data:htr,color:'#4f46e5',dash:false},{data:hte,color:'#ec4899',dash:true}]);
+    const tr=evalLoss(net,train), te=evalLoss(net,test);
+    $('rg-epoch').textContent=epochN;
+    $('rg-trl').textContent=isFinite(tr.loss)?tr.loss.toFixed(3):'∞';
+    $('rg-tel').textContent=isFinite(te.loss)?te.loss.toFixed(3):'∞';
+    const gap=te.loss-tr.loss;
+    $('rg-gap').textContent=(isFinite(gap))?(gap>=0?'+':'')+gap.toFixed(3):'—';
+    if(diverged || !isFinite(tr.loss) || tr.loss>50){
+      msg('<b>⚠ האימון מתבדר!</b> קצב הלמידה η='+c.lr.toFixed(c.lr<0.01?4:2)+' גבוה מדי — הצעדים "קופצים" מעל המינימום וה-Loss מתפוצץ. הקטינו את η ולחצו אפס.','warn');
+    } else if(epochN>25 && gap>0.35){
+      msg('<b>🔎 Overfitting:</b> פער הכללה גדול ('+gap.toFixed(2)+') — הרשת שיננה את רעש האימון. הפעילו <b>L2</b> (λ) או <b>Dropout</b> כדי לרכך את הגבול ולצמצם את הפער.','hint');
+    } else if(epochN>25 && tr.loss<0.35 && gap<0.15){
+      msg('<b>✔ הכללה טובה:</b> ה-Loss נמוך גם באימון וגם בבדיקה, והפער קטן. זהו האזור הרצוי.','ok');
+    }
+  }
+  function stepN(k){
+    const c=cfg();
+    for(let i=0;i<k;i++){ epoch(net,train,c.lr,c.l2,c.drop,10); epochN++; }
+    const tr=evalLoss(net,train), te=evalLoss(net,test);
+    if(!isFinite(tr.loss)) diverged=true;
+    htr.push(tr.loss); hte.push(te.loss); if(htr.length>400){htr.shift();hte.shift();}
+  }
+  function loop(){ if(!running) return; if(!diverged) stepN(2); render(); if(diverged){ pause(); return; } req=requestAnimationFrame(loop); }
+  function play(){ if(running) return; running=true; $('rg-play').textContent='⏸ השהה'; loop(); }
+  function pause(){ running=false; $('rg-play').textContent='▶ אמן'; if(req) cancelAnimationFrame(req); }
+  function reset(){ pause(); build(); render(); }
+
+  $('rg-data').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
+    $('rg-data').querySelectorAll('button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+    dataset=b.dataset.v; reset(); });
+  $('rg-lr').addEventListener('input',()=>{ const lr=Math.pow(10,+$('rg-lr').value); $('rg-lr-v').textContent=lr.toFixed(lr<0.01?4:3);
+    $('rg-lrpreset').querySelectorAll('button').forEach(x=>x.classList.remove('active')); });
+  $('rg-lrpreset').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return;
+    $('rg-lrpreset').querySelectorAll('button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+    $('rg-lr').value=b.dataset.v; const lr=Math.pow(10,+b.dataset.v); $('rg-lr-v').textContent=lr.toFixed(lr<0.01?4:3); });
+  $('rg-l2').addEventListener('input',()=>{ $('rg-l2-v').textContent=(+$('rg-l2').value).toFixed(3); });
+  $('rg-do').addEventListener('input',()=>{ $('rg-do-v').textContent=Math.round(+$('rg-do').value*100)+'%'; });
+  $('rg-noise').addEventListener('input',()=>{ $('rg-noise-v').textContent=(+$('rg-noise').value).toFixed(2); reset(); });
+  $('rg-nh').addEventListener('input',()=>{ $('rg-nh-v').textContent=$('rg-nh').value; reset(); });
+  $('rg-play').addEventListener('click',()=>{ running?pause():play(); });
+  $('rg-step').addEventListener('click',()=>{ if(running) pause(); if(!diverged) stepN(1); render(); });
+  $('rg-reset').addEventListener('click',reset);
+
+  build(); render();
+  return {render,pause,get running(){return running;}};
+})();
+</script>
+</body>
+</html>

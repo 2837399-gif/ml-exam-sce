@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>סימולטור: נושאים מתקדמים (Autoencoder, זיהוי חריגות, אשכולות)</title>
+<style>
+/* ===== Shared theme kit for ML-course simulators & interactive labs =====
+   Inline this verbatim inside a <style> block so the file stays self-contained.
+   Matches the upgraded tutorials (indigo/violet, light cards, RTL). Add your own
+   component CSS below it as needed. */
+:root{
+  --primary:#6366f1; --primary-600:#4f46e5; --secondary:#7c3aed; --secondary-600:#6d28d9;
+  --accent:#ec4899; --info:#3b82f6; --success:#16a34a; --success-500:#22c55e;
+  --warning:#ef4444; --amber:#f59e0b; --ink:#263056; --muted:#5a6688;
+  --surface:#fff; --surface-2:#f6f8fd; --surface-3:#eef2fb; --line:#e4e9f5; --line-2:#d7deee;
+  --grad:linear-gradient(135deg,var(--primary),var(--secondary));
+  --grad-soft:linear-gradient(135deg,#eef2ff,#f5edff);
+  --r-sm:8px; --r-md:14px; --r-lg:20px; --r-pill:999px;
+  --sh-sm:0 2px 6px rgba(30,36,64,.07); --sh-md:0 8px 24px rgba(30,36,64,.10); --sh-lg:0 16px 44px rgba(30,36,64,.16);
+  --font:"Segoe UI","Assistant","Heebo","Rubik","Noto Sans Hebrew",Tahoma,Arial,sans-serif;
+  --mono:"JetBrains Mono","Fira Code","Consolas","Courier New",monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);color:var(--ink);line-height:1.7;min-height:100vh;
+  background:linear-gradient(135deg,#6366f1 0%,#7c3aed 55%,#9333ea 100%) fixed;-webkit-font-smoothing:antialiased}
+.sim-wrap{max-width:1180px;margin:0 auto;padding:1.6rem}
+header,.sim-header{position:relative;overflow:hidden;background:var(--surface);border-radius:var(--r-lg);
+  padding:1.8rem 2rem;margin-bottom:1.2rem;box-shadow:var(--sh-lg);text-align:center}
+header::before,.sim-header::before{content:"";position:absolute;inset-inline:0;top:0;height:6px;
+  background:linear-gradient(90deg,var(--primary),var(--secondary),var(--accent))}
+h1{font-size:clamp(1.5rem,3.4vw,2.2rem);font-weight:800;letter-spacing:-.01em;line-height:1.2;
+  background:linear-gradient(120deg,var(--primary-600),var(--secondary),var(--accent));
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.subtitle,header p{color:var(--muted);font-size:1.05rem;margin-top:.4rem}
+h2{color:var(--primary-600);font-size:1.3rem;font-weight:800;margin:.2rem 0 .8rem}
+h3{color:var(--secondary-600);font-size:1.1rem;font-weight:700;margin:.6rem 0 .4rem}
+
+/* tabs */
+.tabs{display:flex;gap:.4rem;flex-wrap:wrap;justify-content:center;background:rgba(255,255,255,.85);
+  backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:var(--r-pill);
+  padding:.5rem;margin-bottom:1.2rem;box-shadow:var(--sh-sm);position:sticky;top:.5rem;z-index:50}
+.tab{padding:.5rem 1.1rem;border-radius:var(--r-pill);cursor:pointer;font-weight:600;font-size:.92rem;
+  color:var(--muted);border:1px solid transparent;background:none;font-family:inherit;transition:all .2s}
+.tab:hover{background:var(--surface-3);color:var(--primary-600)}
+.tab.active{background:var(--grad);color:#fff;box-shadow:var(--sh-sm)}
+.tabpane{display:none;animation:fade .4s ease}
+.tabpane.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* panels / cards */
+.panel,.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);
+  padding:1.4rem;margin-bottom:1.2rem;box-shadow:var(--sh-md)}
+.panel-grid{display:grid;grid-template-columns:320px 1fr;gap:1.2rem;align-items:start}
+@media(max-width:820px){.panel-grid{grid-template-columns:1fr}}
+
+/* controls */
+.controls{display:flex;flex-direction:column;gap:1rem}
+.control label{display:flex;justify-content:space-between;font-weight:600;font-size:.9rem;margin-bottom:.35rem}
+.control label .val{color:var(--secondary-600);font-family:var(--mono);background:var(--surface-3);
+  padding:.05rem .5rem;border-radius:var(--r-pill)}
+input[type=range]{width:100%;height:8px;border-radius:var(--r-pill);background:var(--surface-3);
+  outline:none;-webkit-appearance:none;appearance:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+  background:var(--grad);cursor:pointer;border:2px solid #fff;box-shadow:var(--sh-sm)}
+input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--secondary);
+  cursor:pointer;border:2px solid #fff}
+select,input[type=number]{font-family:inherit;padding:.45rem .7rem;border:1px solid var(--line-2);
+  border-radius:var(--r-sm);background:var(--surface);color:var(--ink);font-size:.9rem}
+.btn,.btn2{padding:.6rem 1.2rem;border:none;border-radius:var(--r-pill);font-weight:700;cursor:pointer;
+  font-family:inherit;font-size:.92rem;transition:transform .15s,box-shadow .15s;display:inline-flex;align-items:center;gap:.4rem}
+.btn{background:var(--grad);color:#fff;box-shadow:var(--sh-sm)}
+.btn:hover{transform:translateY(-2px);box-shadow:var(--sh-md)}
+.btn2{background:var(--surface);color:var(--primary-600);border:2px solid var(--primary)}
+.btn2:hover{background:var(--primary);color:#fff}
+.btnrow{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem}
+.seg{display:inline-flex;background:var(--surface-3);border-radius:var(--r-pill);padding:.2rem}
+.seg button{border:none;background:none;padding:.4rem .9rem;border-radius:var(--r-pill);cursor:pointer;
+  font-family:inherit;font-weight:600;font-size:.85rem;color:var(--muted)}
+.seg button.active{background:var(--grad);color:#fff}
+
+/* canvas / viz */
+canvas{max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);
+  box-shadow:var(--sh-sm);display:block}
+.viz{display:flex;flex-direction:column;gap:1rem;align-items:center}
+
+/* stat readouts */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.8rem;margin:.4rem 0}
+.stat{background:var(--grad-soft);border:1px solid var(--line);border-radius:var(--r-md);padding:.8rem;text-align:center}
+.stat .k{font-size:.78rem;color:var(--muted);font-weight:600}
+.stat .v{font-size:1.5rem;font-weight:800;color:var(--secondary-600);font-family:var(--mono)}
+
+/* notes / hints */
+.note,.hint{border-radius:var(--r-md);padding:1rem 1.2rem;margin:.8rem 0;border-inline-start:5px solid var(--info);
+  background:linear-gradient(135deg,#eff6ff,#e0efff)}
+.hint{border-inline-start-color:var(--amber);background:linear-gradient(135deg,#fffbeb,#fef3c7)}
+.note h3,.hint h3{margin-top:0}
+
+/* code / output */
+pre{background:#1e293b;color:#e2e8f0;padding:1.2rem;border-radius:var(--r-md);overflow-x:auto;
+  direction:ltr;text-align:left;font-family:var(--mono);font-size:.86rem;line-height:1.55;border:1px solid #2c3a52}
+code{font-family:var(--mono);background:var(--surface-3);color:#4338ca;padding:.1rem .4rem;border-radius:5px;font-size:.88em}
+.output{background:#0f172a;color:#c7f9cc;font-family:var(--mono);font-size:.82rem;padding:1rem 1.2rem;
+  border-radius:var(--r-md);overflow-x:auto;direction:ltr;text-align:left;white-space:pre;border:1px solid #14532d}
+
+/* tables */
+table{width:100%;border-collapse:collapse;margin:.6rem 0;border-radius:var(--r-md);overflow:hidden;box-shadow:var(--sh-sm)}
+th{background:var(--grad);color:#fff;padding:.6rem;font-weight:700}
+td{padding:.55rem;border-bottom:1px solid var(--line);text-align:center}
+tr:nth-child(even) td{background:var(--surface-2)}
+
+footer{color:#ede9fe;text-align:center;font-size:.85rem;padding:1.2rem;opacity:.9}
+@media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+/* ===== component CSS (page-specific) ===== */
+.legend{display:flex;gap:1.1rem;flex-wrap:wrap;justify-content:center;font-size:.82rem;color:var(--muted);margin-top:.2rem}
+.legend .chip{display:inline-flex;align-items:center;gap:.4rem}
+.dot{width:13px;height:13px;border-radius:50%;display:inline-block;border:1px solid rgba(0,0,0,.15)}
+.dot.sq{border-radius:3px}
+.dot.ring{background:#fff;border:2px solid #111}
+.two-can{display:grid;grid-template-columns:1fr;gap:.9rem;width:100%}
+.latent{display:flex;gap:5px;align-items:flex-end;height:78px;padding:.5rem;background:var(--surface-2);
+  border:1px solid var(--line);border-radius:var(--r-md);justify-content:center}
+.latent .bar{width:22px;border-radius:4px 4px 0 0;min-height:2px;transition:height .15s}
+.control small{color:var(--muted);font-weight:500;font-size:.78rem}
+.tag{display:inline-block;background:var(--surface-3);color:var(--primary-600);border-radius:var(--r-pill);
+  padding:.05rem .55rem;font-size:.75rem;font-weight:700;font-family:var(--mono)}
+.selwrap{display:flex;flex-direction:column;gap:.3rem}
+.selwrap select{width:100%}
+.selwrap>label{font-weight:600;font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="sim-wrap">
+  <header>
+    <h1>נושאים מתקדמים בלמידת מכונה</h1>
+    <p class="subtitle">Autoencoder · זיהוי חריגות · אשכולות ו-t-SNE — סימולטור אינטראקטיבי לשבוע 11</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="ae" role="tab">① Autoencoder</button>
+    <button class="tab" data-tab="ano" role="tab">② זיהוי חריגות</button>
+    <button class="tab" data-tab="tsne" role="tab">③ אשכולות / t-SNE</button>
+  </div>
+
+  <!-- ================= TAB 1: AUTOENCODER ================= -->
+  <section id="ae" class="tabpane active" role="tabpanel">
+    <div class="note">
+      <h3>למידת ייצוג (Representation Learning) עם Autoencoder</h3>
+      Autoencoder הוא רשת נוירונים לא-מפוקחת שלומדת <b>לשחזר את הקלט של עצמה</b>: המקודד
+      <span class="tag">encoder</span> דוחס את האות ל<b>ווקטור סמוי</b> קטן <span class="tag">z</span> ב"צוואר בקבוק",
+      והמפענח <span class="tag">decoder</span> מנסה לשחזר ממנו את האות המקורי. כשצוואר הבקבוק קטן מהמימד המקורי,
+      הרשת נאלצת ללמוד ייצוג <b>דחוס</b> שמשמר את המידע החשוב. כאן מאמנים AE אמיתי (backprop + Adam) על אות
+      בן 16 דגימות שנוצר מ-<span class="tag">K</span> רכיבי בסיס — לכן קוד בגודל K כבר מספיק לשחזור כמעט מושלם.
+    </div>
+    <div class="panel">
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control">
+            <label>גודל צוואר הבקבוק <span class="val" id="aeBotV">3</span></label>
+            <input type="range" id="aeBot" min="1" max="8" step="1" value="3">
+            <small>מימד הווקטור הסמוי z (המקור: 16)</small>
+          </div>
+          <div class="control">
+            <label>מספר רכיבי בסיס K <span class="val" id="aeKV">3</span></label>
+            <input type="range" id="aeK" min="1" max="6" step="1" value="3">
+            <small>הממד הפנימי (intrinsic) של הנתונים</small>
+          </div>
+          <div class="control">
+            <label>רעש בנתונים <span class="val" id="aeNoiseV">0.05</span></label>
+            <input type="range" id="aeNoise" min="0" max="0.4" step="0.01" value="0.05">
+          </div>
+          <div class="control">
+            <label>קצב למידה (lr) <span class="val" id="aeLrV">0.010</span></label>
+            <input type="range" id="aeLr" min="0.002" max="0.03" step="0.001" value="0.01">
+          </div>
+          <div class="control">
+            <label>דגימה לתצוגה <span class="val" id="aeSampV">0</span></label>
+            <input type="range" id="aeSamp" min="0" max="119" step="1" value="0">
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="aeToggle">⏸ עצור אימון</button>
+            <button class="btn2" id="aeReset">↺ אתחל רשת</button>
+          </div>
+          <div class="btnrow">
+            <button class="btn2" id="aeNew">🎲 נתונים חדשים</button>
+            <button class="btn2" id="aeRand">דגימה אקראית</button>
+          </div>
+          <div class="hint" style="margin-top:.4rem">
+            <b>נסו:</b> הקטינו את צוואר הבקבוק ל-1 — השחזור מתקלקל. הגדילו אותו עד ל-K — השגיאה צונחת.
+            מעבר ל-K כמעט אין שיפור: זו <b>הדחיסה</b> שה-AE מגלה בעצמו.
+          </div>
+        </div>
+
+        <div class="viz">
+          <div class="stat-grid" style="width:100%">
+            <div class="stat"><div class="k">שגיאת שחזור MSE</div><div class="v" id="aeMse">—</div></div>
+            <div class="stat"><div class="k">שונות שנשמרה</div><div class="v" id="aeVar">—</div></div>
+            <div class="stat"><div class="k">איטרציות אימון</div><div class="v" id="aeIter">0</div></div>
+            <div class="stat"><div class="k">פרמטרים ברשת</div><div class="v" id="aeParams">—</div></div>
+          </div>
+          <div class="two-can">
+            <canvas id="aeSig" width="470" height="210"></canvas>
+            <div class="legend">
+              <span class="chip"><span class="dot" style="background:#4f46e5"></span> אות מקורי</span>
+              <span class="chip"><span class="dot" style="background:#ec4899"></span> שחזור AE</span>
+            </div>
+            <div class="latent" id="aeLatent" title="ערכי הווקטור הסמוי z"></div>
+            <div style="text-align:center;font-size:.8rem;color:var(--muted)">הווקטור הסמוי z (קוד הדחיסה) עבור הדגימה הנבחרת</div>
+            <canvas id="aePca" width="470" height="220"></canvas>
+            <div class="legend">
+              <span class="chip"><span class="dot" style="background:#7c3aed"></span> שונות מצטברת ב-PCA</span>
+              <span class="chip"><span class="dot sq" style="background:#16a34a"></span> נקודת ה-AE (z בגודל הנוכחי)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      <h3>Autoencoder מול PCA</h3>
+      הגרף התחתון מציג את <b>השונות המצטברת</b> שנשמרת ע"י PCA כפונקציה של מספר הרכיבים (העמודים הראשיים).
+      זהו חסם לדחיסה לינארית. הריבוע הירוק מסמן כמה שונות משמר ה-AE שלכם בפועל עם צוואר בגודל הנוכחי.
+      AE לא-לינארי (עם tanh) יכול לעיתים לעקוף את PCA משום שהוא לומד גם עקמומיות (manifold) ולא רק תת-מרחב לינארי.
+    </div>
+  </section>
+
+  <!-- ================= TAB 2: ANOMALY DETECTION ================= -->
+  <section id="ano" class="tabpane" role="tabpanel">
+    <div class="note">
+      <h3>זיהוי חריגות (Anomaly / Outlier Detection)</h3>
+      חריגה היא נקודה ש"לא מתאימה" לרוב הנתונים. בשיטות לא-מפוקחות נותנים לכל נקודה <b>ציון חריגות</b>
+      (anomaly score) — ככל שגבוה יותר, כך הנקודה חשודה יותר — ומסמנים כחריגות כל מה שמעל <b>סף</b>.
+      בחרו שיטת ניקוד, גררו את הסף וצפו ב-<b>Precision / Recall</b> מול האמת. לחצו על הבד כדי להוסיף נקודת בדיקה.
+    </div>
+    <div class="panel">
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control selwrap">
+            <label>שיטת ניקוד</label>
+            <select id="anoMethod">
+              <option value="knn">מרחק לשכן ה-k (kNN distance)</option>
+              <option value="maha">מרחק מהלנוביס (Mahalanobis)</option>
+              <option value="kde">צפיפות KDE (‎−log density)</option>
+              <option value="iforest">Isolation Forest (חלוקות אקראיות)</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>סף חריגות <span class="val" id="anoThrV">0.60</span></label>
+            <input type="range" id="anoThr" min="0" max="1" step="0.01" value="0.6">
+            <small>נקודות עם ציון ≥ הסף מסומנות אדום</small>
+          </div>
+          <div class="control">
+            <label>מספר חריגות אמיתיות <span class="val" id="anoOutV">10</span></label>
+            <input type="range" id="anoOut" min="2" max="24" step="1" value="10">
+          </div>
+          <div class="control" id="anoKwrap">
+            <label>k (עבור kNN) <span class="val" id="anoKV">5</span></label>
+            <input type="range" id="anoK" min="1" max="15" step="1" value="5">
+          </div>
+          <div class="control" id="anoHwrap">
+            <label>רוחב פס KDE (h) <span class="val" id="anoHV">0.45</span></label>
+            <input type="range" id="anoH" min="0.15" max="1.2" step="0.01" value="0.45">
+          </div>
+          <div class="control" id="anoTwrap">
+            <label>מספר עצים (iForest) <span class="val" id="anoTV">40</span></label>
+            <input type="range" id="anoT" min="5" max="120" step="5" value="40">
+          </div>
+          <label style="display:flex;align-items:center;gap:.5rem;font-weight:600;font-size:.9rem">
+            <input type="checkbox" id="anoParts"> הצג חלוקות Isolation אקראיות
+          </label>
+          <div class="btnrow">
+            <button class="btn" id="anoAuto">✨ סף אוטומטי (F1 מרבי)</button>
+          </div>
+          <div class="btnrow">
+            <button class="btn2" id="anoNew">🎲 נתונים חדשים</button>
+            <button class="btn2" id="anoClear">נקה נקודות בדיקה</button>
+          </div>
+        </div>
+
+        <div class="viz">
+          <div class="stat-grid" style="width:100%">
+            <div class="stat"><div class="k">Precision (דיוק)</div><div class="v" id="anoPrec">—</div></div>
+            <div class="stat"><div class="k">Recall (כיסוי)</div><div class="v" id="anoRec">—</div></div>
+            <div class="stat"><div class="k">F1</div><div class="v" id="anoF1">—</div></div>
+            <div class="stat"><div class="k">TP / FP / FN</div><div class="v" id="anoCm" style="font-size:1.05rem">—</div></div>
+          </div>
+          <canvas id="anoCanvas" width="470" height="470"></canvas>
+          <div class="legend">
+            <span class="chip"><span class="dot" style="background:#ef4444"></span> סומן חריגה</span>
+            <span class="chip"><span class="dot" style="background:#4f46e5"></span> סומן תקין</span>
+            <span class="chip"><span class="dot ring"></span> חריגה אמיתית (ground-truth)</span>
+            <span class="chip"><span class="dot sq" style="background:#f59e0b"></span> נקודת בדיקה שהוספתם</span>
+          </div>
+          <canvas id="anoHist" width="470" height="150"></canvas>
+          <div style="text-align:center;font-size:.8rem;color:var(--muted)">היסטוגרמת ציוני החריגות — כחול=תקינים, כתום=חריגות, קו אדום=סף</div>
+        </div>
+      </div>
+    </div>
+    <div class="hint">
+      <h3>אינטואיציית Isolation Forest</h3>
+      במקום למדוד צפיפות, iForest <b>מבודד</b> נקודות ע"י חלוקות אקראיות של המרחב (בחירת ציר וסף אקראיים).
+      חריגה נמצאת באזור דליל ולכן <b>מבודדת אחרי מעט חלוקות</b> (מסלול קצר בעץ), בעוד נקודה תקינה דורשת חלוקות רבות.
+      הפעילו "הצג חלוקות" כדי לראות איך קווי חיתוך אקראיים כולאים מהר את הנקודות המבודדות.
+    </div>
+  </section>
+
+  <!-- ================= TAB 3: CLUSTERING / t-SNE ================= -->
+  <section id="tsne" class="tabpane" role="tabpanel">
+    <div class="note">
+      <h3>הטמעה (Embedding) ואינטואיציית t-SNE</h3>
+      נתונים במימד גבוה קשים להצגה. שיטות כמו <b>t-SNE / UMAP</b> ממפות אותם ל-2D תוך <b>שימור שכנויות</b>:
+      נקודות קרובות במימד הגבוה נמשכות זו לזו, וכל השאר נדחות. כך מבנה אשכולות "צף" למעלה גם ללא תוויות.
+      כאן רץ מודל כוחות פשוט (משיכת שכנים + דחייה מסוג Student-t) שמחקה את t-SNE. השוו ל-<b>PCA</b> הלינארי,
+      שלרוב לא מצליח להפריד מבנים לא-לינאריים כמו טבעות.
+    </div>
+    <div class="panel">
+      <div class="panel-grid">
+        <div class="controls">
+          <div class="control selwrap">
+            <label>מערך נתונים</label>
+            <select id="tsData">
+              <option value="blobs">3 אשכולות גאוסיאניים (ממד D)</option>
+              <option value="rings">3 טבעות מקוננות</option>
+              <option value="swiss">Swiss Roll (3D)</option>
+            </select>
+          </div>
+          <div class="control selwrap">
+            <label>תצוגה</label>
+            <div class="seg" id="tsView">
+              <button data-v="force" class="active">הטמעה כוחית</button>
+              <button data-v="pca">PCA (2 רכיבים)</button>
+            </div>
+          </div>
+          <div class="control selwrap">
+            <label>צביעה לפי</label>
+            <div class="seg" id="tsColor">
+              <button data-c="true" class="active">אשכול אמיתי</button>
+              <button data-c="kmeans">k-means</button>
+            </div>
+          </div>
+          <div class="control" id="tsDimWrap">
+            <label>מימד הנתונים D <span class="val" id="tsDimV">6</span></label>
+            <input type="range" id="tsDim" min="3" max="12" step="1" value="6">
+          </div>
+          <div class="control">
+            <label>שכנים (perplexity ≈ k) <span class="val" id="tsKV">10</span></label>
+            <input type="range" id="tsK" min="3" max="25" step="1" value="10">
+          </div>
+          <div class="control">
+            <label>עוצמת דחייה <span class="val" id="tsRepV">1.0</span></label>
+            <input type="range" id="tsRep" min="0.2" max="3" step="0.1" value="1.0">
+          </div>
+          <div class="control">
+            <label>קצב עדכון <span class="val" id="tsLrV">3.0</span></label>
+            <input type="range" id="tsLr" min="0.5" max="8" step="0.5" value="3.0">
+          </div>
+          <div class="btnrow">
+            <button class="btn" id="tsToggle">⏸ עצור</button>
+            <button class="btn2" id="tsReset">↺ אתחל</button>
+            <button class="btn2" id="tsNew">🎲 נתונים חדשים</button>
+          </div>
+        </div>
+
+        <div class="viz">
+          <div class="stat-grid" style="width:100%">
+            <div class="stat"><div class="k">איטרציה</div><div class="v" id="tsIter">0</div></div>
+            <div class="stat"><div class="k">נקודות</div><div class="v" id="tsN">—</div></div>
+            <div class="stat"><div class="k">שכנויות שנשמרו</div><div class="v" id="tsPres">—</div></div>
+            <div class="stat"><div class="k">תצוגה</div><div class="v" id="tsMode" style="font-size:1rem">כוחי</div></div>
+          </div>
+          <canvas id="tsCanvas" width="470" height="470"></canvas>
+          <div class="legend" id="tsLegend"></div>
+        </div>
+      </div>
+    </div>
+    <div class="hint">
+      <h3>למה t-SNE טוב יותר מ-PCA כאן?</h3>
+      PCA מוצא כיוונים של <b>שונות מרבית</b> בלבד — הטלה לינארית. עבור "3 טבעות מקוננות" כל הטבעות חולקות אותו מרכז,
+      אז ההטלה הלינארית מרסקת אותן זו על זו. הטמעה מבוססת-שכנויות שומרת מי-קרוב-למי ולכן מפרידה את הטבעות לקשתות נבדלות.
+      שימו לב: מרחקים <b>בין</b> אשכולות ב-t-SNE אינם אמינים — רק המבנה המקומי משמעותי.
+    </div>
+  </section>
+
+  <footer>קורס 6100034 · עקרונות בלמידת מכונה · ד״ר חן גלעדי · SCE אשדוד</footer>
+</div>
+
+<script>
+"use strict";
+/* ============ shared helpers ============ */
+function fmt(x,d){ if(!isFinite(x)) return "—"; d=(d==null)?3:d; return x.toFixed(d); }
+function clamp(x,a,b){ return x<a?a:(x>b?b:x); }
+function randn(){ let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random();
+  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function fitCanvas(cv){
+  const w=cv.width, h=cv.height, dpr=Math.min(window.devicePixelRatio||1,2);
+  cv.style.width=w+'px'; cv.style.height=h+'px';
+  cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr);
+  const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  cv._w=w; cv._h=h; return ctx;
+}
+const PALETTE=['#6366f1','#ec4899','#f59e0b','#16a34a','#3b82f6','#7c3aed'];
+
+let activeTab='ae';
+
+/* ==================================================================
+   TAB 1 — AUTOENCODER
+   ================================================================== */
+const AE=(function(){
+  const D=16, H=12, N=120;
+  let bottleneck=3, K=3, noise=0.05, lr=0.01;
+  let data=[], mean=new Float64Array(D), dataVar=1;
+  let layers=[], t=0, iter=0, mse=NaN, varRet=0;
+  let lossHist=[];
+  let sampIdx=0;
+  let running=true;
+  let ctxSig, ctxPca, pcaCurve=[];
+
+  function makeLayer(nin,nout,act){
+    const scale=Math.sqrt(2/(nin+nout));
+    const W=[],mW=[],vW=[];
+    const b=new Float64Array(nout), mb=new Float64Array(nout), vb=new Float64Array(nout);
+    for(let o=0;o<nout;o++){ W[o]=new Float64Array(nin); mW[o]=new Float64Array(nin); vW[o]=new Float64Array(nin);
+      for(let i=0;i<nin;i++) W[o][i]=randn()*scale; }
+    return {nin,nout,act,W,b,mW,vW,mb,vb,gW:null,gb:null,_x:null,_z:null,_a:null};
+  }
+  function fwd(L,x){
+    const z=new Float64Array(L.nout), a=new Float64Array(L.nout);
+    for(let o=0;o<L.nout;o++){ let s=L.b[o]; const Wo=L.W[o];
+      for(let i=0;i<L.nin;i++) s+=Wo[i]*x[i];
+      z[o]=s; a[o]= (L.act==='tanh')? Math.tanh(s): s; }
+    L._x=x; L._z=z; L._a=a; return a;
+  }
+  function zeroGrad(L){
+    if(!L.gW){ L.gW=[]; for(let o=0;o<L.nout;o++) L.gW[o]=new Float64Array(L.nin); L.gb=new Float64Array(L.nout); }
+    else { for(let o=0;o<L.nout;o++) L.gW[o].fill(0); L.gb.fill(0); }
+  }
+  function backward(L,dA){
+    const dX=new Float64Array(L.nin);
+    for(let o=0;o<L.nout;o++){
+      let dz=dA[o];
+      if(L.act==='tanh'){ const a=L._a[o]; dz*=(1-a*a); }
+      L.gb[o]+=dz;
+      const Wo=L.W[o], gWo=L.gW[o], x=L._x;
+      for(let i=0;i<L.nin;i++){ gWo[i]+=dz*x[i]; dX[i]+=Wo[i]*dz; }
+    }
+    return dX;
+  }
+  function adamStep(L,bs){
+    const b1=0.9,b2=0.999,eps=1e-8;
+    const c1=1-Math.pow(b1,t), c2=1-Math.pow(b2,t);
+    for(let o=0;o<L.nout;o++){
+      let g=L.gb[o]/bs;
+      L.mb[o]=b1*L.mb[o]+(1-b1)*g; L.vb[o]=b2*L.vb[o]+(1-b2)*g*g;
+      L.b[o]-=lr*(L.mb[o]/c1)/(Math.sqrt(L.vb[o]/c2)+eps);
+      const Wo=L.W[o],gWo=L.gW[o],mWo=L.mW[o],vWo=L.vW[o];
+      for(let i=0;i<L.nin;i++){ const gg=gWo[i]/bs;
+        mWo[i]=b1*mWo[i]+(1-b1)*gg; vWo[i]=b2*vWo[i]+(1-b2)*gg*gg;
+        Wo[i]-=lr*(mWo[i]/c1)/(Math.sqrt(vWo[i]/c2)+eps); }
+    }
+  }
+  function forwardAll(x){
+    const a1=fwd(layers[0],x); const code=fwd(layers[1],a1);
+    const a3=fwd(layers[2],code); const out=fwd(layers[3],a3);
+    return {out,code};
+  }
+  function buildNet(){
+    layers=[ makeLayer(D,H,'tanh'), makeLayer(H,bottleneck,'lin'),
+             makeLayer(bottleneck,H,'tanh'), makeLayer(H,D,'lin') ];
+    t=0; iter=0; lossHist=[]; mse=NaN;
+  }
+  function genData(){
+    data=[];
+    for(let n=0;n<N;n++){
+      const x=new Float64Array(D);
+      const coeff=[]; for(let k=0;k<K;k++) coeff.push(randn());
+      for(let ti=0;ti<D;ti++){
+        let v=0;
+        for(let k=0;k<K;k++) v+=coeff[k]*Math.sin(Math.PI*(k+1)*(ti+1)/(D+1));
+        v+=noise*randn()*Math.sqrt(D);
+        x[ti]=v;
+      }
+      data.push(x);
+    }
+    mean=new Float64Array(D);
+    for(const x of data) for(let i=0;i<D;i++) mean[i]+=x[i]/N;
+    let sd=0; for(const x of data) for(let i=0;i<D;i++){ const dv=x[i]-mean[i]; sd+=dv*dv; }
+    sd=Math.sqrt(sd/(N*D))+1e-9;
+    for(const x of data) for(let i=0;i<D;i++) x[i]=(x[i]-mean[i])/sd;
+    mean=new Float64Array(D);
+    for(const x of data) for(let i=0;i<D;i++) mean[i]+=x[i]/N;
+    dataVar=0; for(const x of data) for(let i=0;i<D;i++){ const dv=x[i]-mean[i]; dataVar+=dv*dv; }
+    dataVar=dataVar/(N*D)+1e-12;
+  }
+  function pcaCumVar(){
+    const C=[]; for(let i=0;i<D;i++) C[i]=new Float64Array(D);
+    for(const x of data) for(let i=0;i<D;i++){ const di=x[i]-mean[i];
+      for(let j=0;j<D;j++) C[i][j]+=di*(x[j]-mean[j]); }
+    for(let i=0;i<D;i++) for(let j=0;j<D;j++) C[i][j]/=N;
+    const A=[]; for(let i=0;i<D;i++) A[i]=Float64Array.from(C[i]);
+    for(let sweep=0;sweep<60;sweep++){
+      let off=0; for(let p=0;p<D;p++) for(let q=p+1;q<D;q++) off+=A[p][q]*A[p][q];
+      if(off<1e-12) break;
+      for(let p=0;p<D;p++) for(let q=p+1;q<D;q++){
+        if(Math.abs(A[p][q])<1e-14) continue;
+        const app=A[p][p],aqq=A[q][q],apq=A[p][q];
+        const phi=0.5*Math.atan2(2*apq,aqq-app);
+        const c=Math.cos(phi),s=Math.sin(phi);
+        for(let k=0;k<D;k++){ const akp=A[k][p],akq=A[k][q]; A[k][p]=c*akp-s*akq; A[k][q]=s*akp+c*akq; }
+        for(let k=0;k<D;k++){ const apk=A[p][k],aqk=A[q][k]; A[p][k]=c*apk-s*aqk; A[q][k]=s*apk+c*aqk; }
+      }
+    }
+    const ev=[]; for(let i=0;i<D;i++) ev.push(Math.max(A[i][i],0));
+    ev.sort((a,b)=>b-a);
+    let tot=0; for(const e of ev) tot+=e; tot+=1e-12;
+    const cum=[]; let run=0; for(const e of ev){ run+=e; cum.push(run/tot); }
+    return cum;
+  }
+  function computeMetrics(){
+    let err=0;
+    for(const x of data){ const r=forwardAll(x);
+      for(let i=0;i<D;i++){ const d=r.out[i]-x[i]; err+=d*d; } }
+    mse=err/(N*D);
+    varRet=clamp(1-mse/dataVar,0,1);
+  }
+  function trainStep(){
+    if(!layers.length) return;
+    const B=16;
+    for(let s=0;s<layers.length;s++) zeroGrad(layers[s]);
+    for(let b=0;b<B;b++){
+      const x=data[(Math.random()*N)|0];
+      const r=forwardAll(x);
+      const dOut=new Float64Array(D);
+      for(let i=0;i<D;i++){ dOut[i]=2*(r.out[i]-x[i])/D; }
+      let g=dOut;
+      g=backward(layers[3],g); g=backward(layers[2],g);
+      g=backward(layers[1],g); backward(layers[0],g);
+    }
+    t++;
+    for(let s=0;s<layers.length;s++) adamStep(layers[s],B);
+    iter++;
+    if(iter%4===0){ computeMetrics(); lossHist.push(mse); if(lossHist.length>220) lossHist.shift(); }
+  }
+  function drawSignal(){
+    const ctx=ctxSig, W=ctx.canvas._w, Ht=ctx.canvas._h;
+    ctx.clearRect(0,0,W,Ht);
+    const padL=34,padR=12,padT=14,padB=22;
+    const x0=data[sampIdx]||data[0];
+    const r=forwardAll(x0); const out=r.out, code=r.code;
+    let mn=Infinity,mx=-Infinity;
+    for(let i=0;i<D;i++){ mn=Math.min(mn,x0[i],out[i]); mx=Math.max(mx,x0[i],out[i]); }
+    if(!isFinite(mn)){mn=-1;mx=1;} if(mx-mn<1e-6){mx+=1;mn-=1;}
+    const pd=(mx-mn)*0.12; mn-=pd; mx+=pd;
+    const X=i=> padL+(W-padL-padR)*(i/(D-1));
+    const Y=v=> padT+(Ht-padT-padB)*(1-(v-mn)/(mx-mn));
+    ctx.strokeStyle='#eef2fb'; ctx.lineWidth=1;
+    for(let g=0;g<=4;g++){ const yy=padT+(Ht-padT-padB)*g/4; ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(W-padR,yy); ctx.stroke(); }
+    if(mn<0&&mx>0){ ctx.strokeStyle='#d7deee'; ctx.beginPath(); ctx.moveTo(padL,Y(0)); ctx.lineTo(W-padR,Y(0)); ctx.stroke(); }
+    function poly(arr,color,wid){ ctx.strokeStyle=color; ctx.lineWidth=wid; ctx.beginPath();
+      for(let i=0;i<D;i++){ const px=X(i),py=Y(arr[i]); if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py);} ctx.stroke();
+      ctx.fillStyle=color; for(let i=0;i<D;i++){ ctx.beginPath(); ctx.arc(X(i),Y(arr[i]),2.6,0,7); ctx.fill(); } }
+    poly(x0,'#4f46e5',2.4);
+    poly(out,'#ec4899',2.4);
+    ctx.fillStyle='#5a6688'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('אינדקס דגימה (0…15)',W/2,Ht-6);
+    ctx.save(); ctx.translate(11,Ht/2); ctx.rotate(-Math.PI/2); ctx.fillText('ערך',0,0); ctx.restore();
+    if(lossHist.length>2){
+      const lw=110,lh=42,lx=padL+4,ly=padT+2;
+      let lmn=Infinity,lmx=-Infinity; for(const v of lossHist){ lmn=Math.min(lmn,v); lmx=Math.max(lmx,v);}
+      if(lmx-lmn<1e-9)lmx=lmn+1e-9;
+      ctx.fillStyle='rgba(246,248,253,.85)'; ctx.fillRect(lx,ly,lw,lh);
+      ctx.strokeStyle='#e4e9f5'; ctx.strokeRect(lx,ly,lw,lh);
+      ctx.strokeStyle='#16a34a'; ctx.lineWidth=1.6; ctx.beginPath();
+      for(let i=0;i<lossHist.length;i++){ const px=lx+lw*i/(lossHist.length-1);
+        const py=ly+lh*(1-(lossHist[i]-lmn)/(lmx-lmn)); if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py);} ctx.stroke();
+      ctx.fillStyle='#5a6688'; ctx.font='9px sans-serif'; ctx.textAlign='left';
+      ctx.fillText('MSE לאורך האימון',lx+3,ly+11);
+    }
+    drawLatent(code);
+  }
+  function drawLatent(code){
+    const box=document.getElementById('aeLatent'); box.innerHTML='';
+    let mx=1e-6; for(const c of code) mx=Math.max(mx,Math.abs(c));
+    for(let i=0;i<code.length;i++){
+      const bar=document.createElement('div'); bar.className='bar';
+      bar.style.height=(6+Math.abs(code[i])/mx*60)+'px';
+      bar.style.background= code[i]>=0 ? 'linear-gradient(135deg,#6366f1,#7c3aed)' : 'linear-gradient(135deg,#ec4899,#f59e0b)';
+      bar.title='z['+i+'] = '+fmt(code[i],3);
+      box.appendChild(bar);
+    }
+  }
+  function drawPca(){
+    const ctx=ctxPca, W=ctx.canvas._w, Ht=ctx.canvas._h;
+    ctx.clearRect(0,0,W,Ht);
+    const padL=40,padR=14,padT=14,padB=30;
+    const X=k=> padL+(W-padL-padR)*(k/D);
+    const Y=v=> padT+(Ht-padT-padB)*(1-v);
+    ctx.strokeStyle='#eef2fb'; ctx.lineWidth=1;
+    for(let g=0;g<=5;g++){ const yy=padT+(Ht-padT-padB)*g/5; ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(W-padR,yy); ctx.stroke();
+      ctx.fillStyle='#8a93b2'; ctx.font='9px sans-serif'; ctx.textAlign='right'; ctx.fillText((100-g*20)+'%',padL-4,yy+3); }
+    ctx.strokeStyle='#7c3aed'; ctx.lineWidth=2.4; ctx.beginPath();
+    for(let k=0;k<pcaCurve.length;k++){ const px=X(k+1),py=Y(pcaCurve[k]); if(k===0)ctx.moveTo(px,py); else ctx.lineTo(px,py);} ctx.stroke();
+    ctx.fillStyle='#7c3aed'; for(let k=0;k<pcaCurve.length;k++){ ctx.beginPath(); ctx.arc(X(k+1),Y(pcaCurve[k]),2.4,0,7); ctx.fill(); }
+    const bx=X(bottleneck);
+    ctx.strokeStyle='#16a34a'; ctx.lineWidth=1.6; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(bx,padT); ctx.lineTo(bx,Ht-padB); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle='#16a34a'; ctx.strokeStyle='#fff'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.rect(bx-5,Y(varRet)-5,10,10); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#5a6688'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('מספר רכיבים / גודל צוואר z',W/2,Ht-8);
+    ctx.textAlign='left'; ctx.fillStyle='#16a34a'; ctx.font='10px sans-serif';
+    ctx.fillText('AE: '+(varRet*100).toFixed(0)+'%', clamp(bx+6,padL,W-70), clamp(Y(varRet)-8,padT+8,Ht-padB));
+  }
+  function updateReadouts(){
+    document.getElementById('aeMse').textContent= isFinite(mse)? fmt(mse,4):'—';
+    document.getElementById('aeVar').textContent= (varRet*100).toFixed(1)+'%';
+    document.getElementById('aeIter').textContent= iter;
+    const p=(D*H+H)+(H*bottleneck+bottleneck)+(bottleneck*H+H)+(H*D+D);
+    document.getElementById('aeParams').textContent= p;
+  }
+  function draw(){ if(!ctxSig) return; drawSignal(); drawPca(); updateReadouts(); }
+  function reset(){ buildNet(); computeMetrics(); draw(); }
+  function newData(){ genData(); pcaCurve=pcaCumVar(); reset(); }
+  function step(){ if(!layers.length) return; for(let s=0;s<3;s++) trainStep(); draw(); }
+  function init(){
+    ctxSig=fitCanvas(document.getElementById('aeSig'));
+    ctxPca=fitCanvas(document.getElementById('aePca'));
+    genData(); pcaCurve=pcaCumVar(); buildNet(); computeMetrics(); draw();
+    const bind=(id,vid,fn,fx)=>{ const el=document.getElementById(id);
+      el.addEventListener('input',()=>{ document.getElementById(vid).textContent=fx?fx(el.value):el.value; fn(el.value); }); };
+    bind('aeBot','aeBotV',v=>{ bottleneck=+v; reset(); });
+    bind('aeK','aeKV',v=>{ K=+v; newData(); });
+    bind('aeNoise','aeNoiseV',v=>{ noise=+v; newData(); }, v=>(+v).toFixed(2));
+    bind('aeLr','aeLrV',v=>{ lr=+v; }, v=>(+v).toFixed(3));
+    bind('aeSamp','aeSampV',v=>{ sampIdx=+v; draw(); });
+    document.getElementById('aeToggle').addEventListener('click',function(){
+      running=!running; this.textContent= running?'⏸ עצור אימון':'▶ המשך אימון'; });
+    document.getElementById('aeReset').addEventListener('click',()=>reset());
+    document.getElementById('aeNew').addEventListener('click',()=>newData());
+    document.getElementById('aeRand').addEventListener('click',()=>{ sampIdx=(Math.random()*N)|0;
+      document.getElementById('aeSamp').value=sampIdx; document.getElementById('aeSampV').textContent=sampIdx; draw(); });
+  }
+  return { init, draw, step, get running(){return running;} };
+})();
+
+/* ==================================================================
+   TAB 2 — ANOMALY DETECTION
+   ================================================================== */
+const ANO=(function(){
+  let ctx, ctxH;
+  const RANGE=3.3;
+  let pts=[], extra=[];
+  let method='knn', threshold=0.6, nOut=10, k=5, h=0.45, nTrees=40, showParts=false;
+  let metrics={prec:0,rec:0,f1:0,tp:0,fp:0,fn:0};
+  let scores=[], flags=[], partSegs=[];
+
+  function gen(){
+    pts=[]; extra=[];
+    const c1=[-1.15,-0.35], c2=[1.05,0.55], nNorm=42;
+    for(let i=0;i<nNorm;i++) pts.push({x:c1[0]+randn()*0.5,y:c1[1]+randn()*0.5,label:0});
+    for(let i=0;i<nNorm;i++) pts.push({x:c2[0]+randn()*0.45,y:c2[1]+randn()*0.55,label:0});
+    for(let i=0;i<nOut;i++){
+      let x,y,tries=0;
+      do{ x=(Math.random()*2-1)*RANGE*0.92; y=(Math.random()*2-1)*RANGE*0.92; tries++;
+      }while(tries<20 && (Math.hypot(x-c1[0],y-c1[1])<0.9 || Math.hypot(x-c2[0],y-c2[1])<0.9));
+      pts.push({x,y,label:1});
+    }
+  }
+  function allPts(){ return pts.concat(extra.map(e=>({x:e.x,y:e.y,label:null}))); }
+  function scoreKNN(P){
+    const n=P.length, out=new Array(n);
+    for(let i=0;i<n;i++){ const ds=[];
+      for(let j=0;j<n;j++){ if(i===j)continue; ds.push(Math.hypot(P[i].x-P[j].x,P[i].y-P[j].y)); }
+      ds.sort((a,b)=>a-b);
+      const kk=Math.min(k,ds.length-1); out[i]= ds.length? ds[Math.max(0,kk)] : 0; }
+    return out;
+  }
+  function scoreMaha(P){
+    const n=P.length; let mx=0,my=0;
+    for(const p of P){ mx+=p.x/n; my+=p.y/n; }
+    let sxx=0,syy=0,sxy=0;
+    for(const p of P){ const dx=p.x-mx,dy=p.y-my; sxx+=dx*dx/n; syy+=dy*dy/n; sxy+=dx*dy/n; }
+    let det=sxx*syy-sxy*sxy; if(Math.abs(det)<1e-9) det=(det<0?-1:1)*1e-9;
+    const ixx=syy/det, iyy=sxx/det, ixy=-sxy/det;
+    const out=new Array(n);
+    for(let i=0;i<n;i++){ const dx=P[i].x-mx,dy=P[i].y-my;
+      let d2=dx*dx*ixx+2*dx*dy*ixy+dy*dy*iyy; if(d2<0)d2=0; out[i]=Math.sqrt(d2); }
+    return out;
+  }
+  function scoreKDE(P){
+    const n=P.length, out=new Array(n), h2=2*h*h;
+    for(let i=0;i<n;i++){ let dens=0;
+      for(let j=0;j<n;j++){ if(i===j)continue; const d2=(P[i].x-P[j].x)*(P[i].x-P[j].x)+(P[i].y-P[j].y)*(P[i].y-P[j].y); dens+=Math.exp(-d2/h2); }
+      out[i]= -Math.log(dens/Math.max(1,n-1)+1e-9); }
+    return out;
+  }
+  function cFactor(n){ if(n<=1) return 0; return 2*(Math.log(n-1)+0.5772156649)-2*(n-1)/n; }
+  function buildTree(idx,P,depth,maxDepth){
+    if(depth>=maxDepth || idx.length<=1) return {leaf:true,size:idx.length,depth};
+    const f=Math.random()<0.5?'x':'y';
+    let mn=Infinity,mx=-Infinity; for(const i of idx){ const v=P[i][f]; if(v<mn)mn=v; if(v>mx)mx=v; }
+    if(mx-mn<1e-9) return {leaf:true,size:idx.length,depth};
+    const sp=mn+Math.random()*(mx-mn);
+    const L=[],R=[]; for(const i of idx){ (P[i][f]<sp?L:R).push(i); }
+    return {leaf:false,f,sp,depth, left:buildTree(L,P,depth+1,maxDepth), right:buildTree(R,P,depth+1,maxDepth)};
+  }
+  function pathLen(node,p){ while(!node.leaf){ node= (p[node.f]<node.sp)? node.left : node.right; } return node.depth + cFactor(node.size); }
+  function scoreIForest(P){
+    const n=P.length, maxDepth=Math.ceil(Math.log2(Math.max(2,n)))+1;
+    const idxAll=[]; for(let i=0;i<n;i++) idxAll.push(i);
+    const trees=[]; for(let t=0;t<nTrees;t++) trees.push(buildTree(idxAll.slice(),P,0,maxDepth));
+    const c=cFactor(n)||1, out=new Array(n);
+    for(let i=0;i<n;i++){ let s=0; for(const tr of trees) s+=pathLen(tr,P[i]); s/=trees.length; out[i]=Math.pow(2,-s/c); }
+    return out;
+  }
+  function normalize(arr){
+    let mn=Infinity,mx=-Infinity; for(const v of arr){ if(v<mn)mn=v; if(v>mx)mx=v; }
+    const rng=mx-mn; return arr.map(v=> rng<1e-12? 0.5 : (v-mn)/rng);
+  }
+  function recompute(){
+    const P=allPts();
+    let raw;
+    if(method==='knn') raw=scoreKNN(P);
+    else if(method==='maha') raw=scoreMaha(P);
+    else if(method==='kde') raw=scoreKDE(P);
+    else raw=scoreIForest(P);
+    scores=normalize(raw);
+    flags=scores.map(s=> s>=threshold);
+    let tp=0,fp=0,fn=0;
+    for(let i=0;i<P.length;i++){ if(P[i].label==null) continue;
+      const f=flags[i], a=P[i].label===1;
+      if(f&&a)tp++; else if(f&&!a)fp++; else if(!f&&a)fn++; }
+    const prec= (tp+fp)>0? tp/(tp+fp):0;
+    const rec= (tp+fn)>0? tp/(tp+fn):0;
+    const f1= (prec+rec)>0? 2*prec*rec/(prec+rec):0;
+    metrics={prec,rec,f1,tp,fp,fn};
+    if(showParts){ partSegs=[]; const box={x0:-RANGE,x1:RANGE,y0:-RANGE,y1:RANGE};
+      const idx=[]; for(let i=0;i<P.length;i++) idx.push(i);
+      collectSegs(idx,P,box,0,4); }
+    draw(); updateReadouts();
+  }
+  function collectSegs(idx,P,box,depth,maxDepth){
+    if(depth>=maxDepth||idx.length<=1) return;
+    const f=Math.random()<0.5?'x':'y';
+    let mn=Infinity,mx=-Infinity; for(const i of idx){ const v=P[i][f]; if(v<mn)mn=v; if(v>mx)mx=v; }
+    if(mx-mn<1e-9) return;
+    const sp=mn+Math.random()*(mx-mn);
+    if(f==='x') partSegs.push({x0:sp,y0:box.y0,x1:sp,y1:box.y1,depth});
+    else partSegs.push({x0:box.x0,y0:sp,x1:box.x1,y1:sp,depth});
+    const L=[],R=[]; for(const i of idx){ (P[i][f]<sp?L:R).push(i); }
+    const bl=Object.assign({},box), br=Object.assign({},box);
+    if(f==='x'){ bl.x1=sp; br.x0=sp; } else { bl.y1=sp; br.y0=sp; }
+    collectSegs(L,P,bl,depth+1,maxDepth); collectSegs(R,P,br,depth+1,maxDepth);
+  }
+  function SX(x){ return (x+RANGE)/(2*RANGE); }
+  function SY(y){ return 1-(y+RANGE)/(2*RANGE); }
+  function draw(){
+    if(!ctx) return;
+    const W=ctx.canvas._w, Ht=ctx.canvas._h;
+    ctx.clearRect(0,0,W,Ht);
+    ctx.strokeStyle='#f1f4fb'; ctx.lineWidth=1;
+    for(let g=0;g<=8;g++){ const t=g/8; ctx.beginPath(); ctx.moveTo(t*W,0); ctx.lineTo(t*W,Ht); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,t*Ht); ctx.lineTo(W,t*Ht); ctx.stroke(); }
+    if(showParts){ for(const s of partSegs){ ctx.strokeStyle='rgba(124,58,237,'+Math.max(0.12,0.5-s.depth*0.08)+')';
+      ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(SX(s.x0)*W,SY(s.y0)*Ht); ctx.lineTo(SX(s.x1)*W,SY(s.y1)*Ht); ctx.stroke(); } }
+    const P=allPts();
+    for(let i=0;i<P.length;i++){
+      const p=P[i], px=SX(p.x)*W, py=SY(p.y)*Ht, isExtra=(p.label==null);
+      if(p.label===1){ ctx.strokeStyle='#111'; ctx.lineWidth=2.2; ctx.beginPath(); ctx.arc(px,py,8.5,0,7); ctx.stroke(); }
+      if(isExtra){
+        ctx.save(); ctx.translate(px,py); ctx.rotate(Math.PI/4);
+        ctx.fillStyle= flags[i]?'#ef4444':'#f59e0b'; ctx.fillRect(-6,-6,12,12);
+        ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.strokeRect(-6,-6,12,12); ctx.restore();
+      } else {
+        ctx.fillStyle= flags[i]? '#ef4444' : '#4f46e5';
+        ctx.beginPath(); ctx.arc(px,py,5.5,0,7); ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,.85)'; ctx.lineWidth=1.2; ctx.stroke();
+      }
+    }
+    drawHist();
+  }
+  function drawHist(){
+    const W=ctxH.canvas._w, Ht=ctxH.canvas._h;
+    ctxH.clearRect(0,0,W,Ht);
+    const padL=8,padR=8,padT=8,padB=18, nb=26;
+    const binN=new Array(nb).fill(0), binA=new Array(nb).fill(0), P=allPts();
+    for(let i=0;i<P.length;i++){ if(P[i].label==null) continue;
+      let b=Math.min(nb-1,Math.floor(scores[i]*nb));
+      if(P[i].label===1) binA[b]++; else binN[b]++; }
+    let mx=1; for(let b=0;b<nb;b++) mx=Math.max(mx,binN[b]+binA[b]);
+    const bw=(W-padL-padR)/nb;
+    for(let b=0;b<nb;b++){
+      const x=padL+b*bw;
+      const hn=(Ht-padT-padB)*binN[b]/mx, ha=(Ht-padT-padB)*binA[b]/mx;
+      ctxH.fillStyle='#6366f1'; ctxH.fillRect(x+1,Ht-padB-hn,bw-2,hn);
+      ctxH.fillStyle='#f59e0b'; ctxH.fillRect(x+1,Ht-padB-hn-ha,bw-2,ha);
+    }
+    const tx=padL+(W-padL-padR)*threshold;
+    ctxH.strokeStyle='#ef4444'; ctxH.lineWidth=2; ctxH.setLineDash([5,3]);
+    ctxH.beginPath(); ctxH.moveTo(tx,padT); ctxH.lineTo(tx,Ht-padB); ctxH.stroke(); ctxH.setLineDash([]);
+    ctxH.fillStyle='#5a6688'; ctxH.font='10px sans-serif'; ctxH.textAlign='center';
+    ctxH.fillText('ציון חריגות מנורמל 0 → 1',W/2,Ht-5);
+  }
+  function updateReadouts(){
+    document.getElementById('anoPrec').textContent=(metrics.prec*100).toFixed(0)+'%';
+    document.getElementById('anoRec').textContent=(metrics.rec*100).toFixed(0)+'%';
+    document.getElementById('anoF1').textContent=fmt(metrics.f1,2);
+    document.getElementById('anoCm').textContent=metrics.tp+' / '+metrics.fp+' / '+metrics.fn;
+    document.getElementById('anoKwrap').style.opacity= method==='knn'?1:0.4;
+    document.getElementById('anoHwrap').style.opacity= method==='kde'?1:0.4;
+    document.getElementById('anoTwrap').style.opacity= method==='iforest'?1:0.4;
+  }
+  function autoThreshold(){
+    const P=allPts(); let best=0.5,bestF1=-1;
+    for(let s=0;s<=100;s++){ const th=s/100; let tp=0,fp=0,fn=0;
+      for(let i=0;i<P.length;i++){ if(P[i].label==null)continue; const f=scores[i]>=th, a=P[i].label===1;
+        if(f&&a)tp++; else if(f&&!a)fp++; else if(!f&&a)fn++; }
+      const prec=(tp+fp)>0?tp/(tp+fp):0, rec=(tp+fn)>0?tp/(tp+fn):0;
+      const f1=(prec+rec)>0?2*prec*rec/(prec+rec):0;
+      if(f1>bestF1){ bestF1=f1; best=th; } }
+    threshold=best; document.getElementById('anoThr').value=best;
+    document.getElementById('anoThrV').textContent=best.toFixed(2);
+    recompute();
+  }
+  function init(){
+    ctx=fitCanvas(document.getElementById('anoCanvas'));
+    ctxH=fitCanvas(document.getElementById('anoHist'));
+    gen(); recompute();
+    document.getElementById('anoMethod').addEventListener('change',e=>{ method=e.target.value; recompute(); });
+    const b=(id,vid,fn,fx)=>{ const el=document.getElementById(id);
+      el.addEventListener('input',()=>{ document.getElementById(vid).textContent=fx?fx(el.value):el.value; fn(el.value); }); };
+    b('anoThr','anoThrV',v=>{ threshold=+v; recompute(); }, v=>(+v).toFixed(2));
+    b('anoOut','anoOutV',v=>{ nOut=+v; gen(); recompute(); });
+    b('anoK','anoKV',v=>{ k=+v; recompute(); });
+    b('anoH','anoHV',v=>{ h=+v; recompute(); }, v=>(+v).toFixed(2));
+    b('anoT','anoTV',v=>{ nTrees=+v; recompute(); });
+    document.getElementById('anoParts').addEventListener('change',e=>{ showParts=e.target.checked; recompute(); });
+    document.getElementById('anoAuto').addEventListener('click',autoThreshold);
+    document.getElementById('anoNew').addEventListener('click',()=>{ gen(); recompute(); });
+    document.getElementById('anoClear').addEventListener('click',()=>{ extra=[]; recompute(); });
+    const cv=document.getElementById('anoCanvas');
+    cv.addEventListener('click',ev=>{
+      const r=cv.getBoundingClientRect();
+      const fx=(ev.clientX-r.left)/r.width, fy=(ev.clientY-r.top)/r.height;
+      const x=fx*2*RANGE-RANGE, y=(1-fy)*2*RANGE-RANGE;
+      extra.push({x,y}); recompute();
+    });
+  }
+  return { init, draw };
+})();
+
+/* ==================================================================
+   TAB 3 — CLUSTERING / t-SNE INTUITION
+   ================================================================== */
+const TSNE=(function(){
+  let ctx, inited=false, running=true;
+  let dataset='blobs', D=6, kN=10, rep=1.0, lr=3.0, view='force', colorMode='true';
+  let X=[], labels=[], nClusters=3, N=0, dim=6;
+  let Y=[], neigh=[], iter=0, pres=0, kmAssign=[];
+
+  function genBlobs(){
+    X=[]; labels=[]; nClusters=3; dim=D;
+    const centers=[]; for(let c=0;c<nClusters;c++){ const ce=new Float64Array(dim);
+      for(let d=0;d<dim;d++) ce[d]=(Math.random()*2-1)*3.2; centers.push(ce); }
+    for(let c=0;c<nClusters;c++){ for(let i=0;i<30;i++){ const x=new Float64Array(dim);
+      for(let d=0;d<dim;d++) x[d]=centers[c][d]+randn()*0.55; X.push(x); labels.push(c); } }
+  }
+  function genRings(){
+    X=[]; labels=[]; nClusters=3; dim=Math.max(D,2);
+    const radii=[0.8,1.9,3.0];
+    for(let c=0;c<nClusters;c++){ const cnt= 22+c*10;
+      for(let i=0;i<cnt;i++){ const a=Math.random()*2*Math.PI, r=radii[c]+randn()*0.09;
+        const x=new Float64Array(dim); x[0]=r*Math.cos(a); x[1]=r*Math.sin(a);
+        for(let d=2;d<dim;d++) x[d]=randn()*0.05; X.push(x); labels.push(c); } }
+  }
+  function genSwiss(){
+    X=[]; labels=[]; nClusters=3; dim=3;
+    for(let i=0;i<90;i++){ const t=1.5*Math.PI*(1+2*Math.random());
+      const x=new Float64Array(3); x[0]=t*Math.cos(t); x[1]=(Math.random()*2-1)*8; x[2]=t*Math.sin(t);
+      X.push(x); const frac=(t-1.5*Math.PI)/(3*Math.PI); labels.push(Math.min(2,Math.floor(frac*3))); }
+  }
+  function genData(){
+    if(dataset==='blobs') genBlobs(); else if(dataset==='rings') genRings(); else genSwiss();
+    N=X.length; dim=X[0].length; computeNeighbors();
+  }
+  function dist2(a,b){ let s=0; for(let d=0;d<dim;d++){ const dd=a[d]-b[d]; s+=dd*dd; } return s; }
+  function computeNeighbors(){
+    neigh=[]; const kk=Math.min(kN,N-1);
+    for(let i=0;i<N;i++){ const arr=[];
+      for(let j=0;j<N;j++){ if(i===j)continue; arr.push([dist2(X[i],X[j]),j]); }
+      arr.sort((a,b)=>a[0]-b[0]);
+      neigh.push(arr.slice(0,kk).map(e=>e[1])); }
+  }
+  function resetEmbed(){ Y=[]; for(let i=0;i<N;i++) Y.push([randn()*0.1,randn()*0.1]); iter=0; pres=0; runKmeans(); }
+  function stepEmbed(){
+    const kR=rep*0.9, F=[]; for(let i=0;i<N;i++) F.push([0,0]);
+    for(let i=0;i<N;i++){ for(let j=i+1;j<N;j++){
+      let dx=Y[i][0]-Y[j][0], dy=Y[i][1]-Y[j][1];
+      let d2=dx*dx+dy*dy+1e-6; const q=1/(1+d2), f=kR*q*q, fx=f*dx, fy=f*dy;
+      F[i][0]+=fx; F[i][1]+=fy; F[j][0]-=fx; F[j][1]-=fy; }}
+    const kA=0.05;
+    for(let i=0;i<N;i++){ for(const j of neigh[i]){
+      let dx=Y[i][0]-Y[j][0], dy=Y[i][1]-Y[j][1];
+      F[i][0]-=kA*dx; F[i][1]-=kA*dy; F[j][0]+=kA*dx; F[j][1]+=kA*dy; }}
+    const step=lr*0.02;
+    for(let i=0;i<N;i++){ Y[i][0]+=clamp(F[i][0],-40,40)*step; Y[i][1]+=clamp(F[i][1],-40,40)*step; }
+    let mx=0,my=0; for(const y of Y){ mx+=y[0]/N; my+=y[1]/N; }
+    for(const y of Y){ y[0]-=mx; y[1]-=my; }
+    iter++;
+    if(iter%15===0){ computePreservation(); runKmeans(); }
+  }
+  function powerIter(C,orth){
+    let v=new Float64Array(dim); for(let i=0;i<dim;i++) v[i]=Math.random()-0.5;
+    for(let it=0;it<80;it++){ const w=new Float64Array(dim);
+      for(let i=0;i<dim;i++){ let s=0; for(let j=0;j<dim;j++) s+=C[i][j]*v[j]; w[i]=s; }
+      if(orth){ let d=0; for(let i=0;i<dim;i++) d+=w[i]*orth[i]; for(let i=0;i<dim;i++) w[i]-=d*orth[i]; }
+      let nrm=0; for(let i=0;i<dim;i++) nrm+=w[i]*w[i]; nrm=Math.sqrt(nrm)+1e-12;
+      for(let i=0;i<dim;i++) v[i]=w[i]/nrm; }
+    return v;
+  }
+  function pcaProject(){
+    const mu=new Float64Array(dim);
+    for(const x of X) for(let d=0;d<dim;d++) mu[d]+=x[d]/N;
+    const C=[]; for(let i=0;i<dim;i++) C[i]=new Float64Array(dim);
+    for(const x of X){ for(let i=0;i<dim;i++){ const di=x[i]-mu[i];
+      for(let j=0;j<dim;j++) C[i][j]+=di*(x[j]-mu[j])/N; } }
+    const v1=powerIter(C,null), v2=powerIter(C,v1);
+    const P=[]; for(const x of X){ let a=0,b=0; for(let d=0;d<dim;d++){ a+=(x[d]-mu[d])*v1[d]; b+=(x[d]-mu[d])*v2[d]; } P.push([a,b]); }
+    return P;
+  }
+  function computePreservation(){
+    const kk=Math.min(kN,N-1); let tot=0,keep=0;
+    for(let i=0;i<N;i++){ const arr=[];
+      for(let j=0;j<N;j++){ if(i===j)continue; const dx=Y[i][0]-Y[j][0],dy=Y[i][1]-Y[j][1]; arr.push([dx*dx+dy*dy,j]); }
+      arr.sort((a,b)=>a[0]-b[0]); const set=new Set(arr.slice(0,kk).map(e=>e[1]));
+      for(const j of neigh[i]){ tot++; if(set.has(j)) keep++; } }
+    pres= tot>0? keep/tot : 0;
+  }
+  function runKmeans(){
+    const src= (view==='pca')? pcaProject() : Y;
+    if(!src.length){ kmAssign=[]; return; }
+    let cen=[]; const used=new Set();
+    for(let c=0;c<nClusters;c++){ let idx,guard=0; do{ idx=(Math.random()*N)|0; guard++; }while(used.has(idx)&&guard<50); used.add(idx); cen.push([src[idx][0],src[idx][1]]); }
+    const asg=new Array(N).fill(0);
+    for(let it=0;it<12;it++){
+      for(let i=0;i<N;i++){ let bd=Infinity,bc=0;
+        for(let c=0;c<nClusters;c++){ const dx=src[i][0]-cen[c][0],dy=src[i][1]-cen[c][1], d=dx*dx+dy*dy; if(d<bd){bd=d;bc=c;} }
+        asg[i]=bc; }
+      const nc=[]; const cnt=new Array(nClusters).fill(0);
+      for(let c=0;c<nClusters;c++) nc.push([0,0]);
+      for(let i=0;i<N;i++){ nc[asg[i]][0]+=src[i][0]; nc[asg[i]][1]+=src[i][1]; cnt[asg[i]]++; }
+      for(let c=0;c<nClusters;c++){ if(cnt[c]>0){ cen[c][0]=nc[c][0]/cnt[c]; cen[c][1]=nc[c][1]/cnt[c]; } }
+    }
+    kmAssign=asg;
+  }
+  function draw(){
+    if(!ctx) return;
+    const W=ctx.canvas._w, Ht=ctx.canvas._h;
+    ctx.clearRect(0,0,W,Ht);
+    ctx.strokeStyle='#f1f4fb'; ctx.lineWidth=1;
+    for(let g=0;g<=8;g++){ const t=g/8; ctx.beginPath(); ctx.moveTo(t*W,0); ctx.lineTo(t*W,Ht); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,t*Ht); ctx.lineTo(W,t*Ht); ctx.stroke(); }
+    const src= (view==='pca')? pcaProject() : Y;
+    if(!src.length) return;
+    let mnx=Infinity,mxx=-Infinity,mny=Infinity,mxy=-Infinity;
+    for(const p of src){ mnx=Math.min(mnx,p[0]); mxx=Math.max(mxx,p[0]); mny=Math.min(mny,p[1]); mxy=Math.max(mxy,p[1]); }
+    const rx=(mxx-mnx)||1, ry=(mxy-mny)||1, rr=Math.max(rx,ry)*1.12;
+    const cx=(mnx+mxx)/2, cy=(mny+mxy)/2, pad=28;
+    const map=p=>[ pad+(W-2*pad)*((p[0]-cx)/rr+0.5), pad+(Ht-2*pad)*((p[1]-cy)/rr+0.5) ];
+    if(view==='force'){ ctx.strokeStyle='rgba(120,130,170,.10)'; ctx.lineWidth=1;
+      for(let i=0;i<N;i++){ const a=map(Y[i]); for(const j of neigh[i]){ if(j>i){ const b=map(Y[j]);
+        ctx.beginPath(); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); ctx.stroke(); } } } }
+    for(let i=0;i<N;i++){ const p=map(src[i]);
+      const cl= (colorMode==='kmeans' && kmAssign.length)? kmAssign[i] : labels[i];
+      ctx.fillStyle=PALETTE[cl%PALETTE.length]; ctx.beginPath(); ctx.arc(p[0],p[1],5,0,7); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,.8)'; ctx.lineWidth=1.1; ctx.stroke(); }
+    ctx.fillStyle='#5a6688'; ctx.font='11px sans-serif'; ctx.textAlign='right';
+    ctx.fillText(view==='pca'?'הטלת PCA (2 רכיבים ראשיים)':'הטמעה כוחית (t-SNE-like)', W-8, Ht-8);
+  }
+  function updateReadouts(){
+    document.getElementById('tsIter').textContent= view==='pca'? '—' : iter;
+    document.getElementById('tsN').textContent= N;
+    document.getElementById('tsPres').textContent= (pres*100).toFixed(0)+'%';
+    document.getElementById('tsMode').textContent= view==='pca'?'PCA':'כוחי';
+    document.getElementById('tsDimWrap').style.opacity= dataset==='blobs'?1:0.4;
+    const leg=document.getElementById('tsLegend'); leg.innerHTML='';
+    const names= (colorMode==='kmeans')? 'k-means #' : (dataset==='rings'?'טבעת ':(dataset==='swiss'?'קטע ':'אשכול '));
+    for(let c=0;c<nClusters;c++){ const chip=document.createElement('span'); chip.className='chip';
+      chip.innerHTML='<span class="dot" style="background:'+PALETTE[c%PALETTE.length]+'"></span> '+names+(c+1);
+      leg.appendChild(chip); }
+  }
+  function step(){ if(view==='force'){ for(let s=0;s<2;s++) stepEmbed(); } draw(); updateReadouts(); }
+  function fullReset(){ genData(); resetEmbed(); draw(); updateReadouts(); }
+  function init(){
+    if(inited) return; inited=true;
+    ctx=fitCanvas(document.getElementById('tsCanvas'));
+    genData(); resetEmbed(); draw(); updateReadouts();
+    document.getElementById('tsData').addEventListener('change',e=>{ dataset=e.target.value; fullReset(); });
+    const b=(id,vid,fn,fx)=>{ const el=document.getElementById(id);
+      el.addEventListener('input',()=>{ document.getElementById(vid).textContent=fx?fx(el.value):el.value; fn(el.value); }); };
+    b('tsDim','tsDimV',v=>{ D=+v; if(dataset==='blobs') fullReset(); });
+    b('tsK','tsKV',v=>{ kN=+v; computeNeighbors(); });
+    b('tsRep','tsRepV',v=>{ rep=+v; }, v=>(+v).toFixed(1));
+    b('tsLr','tsLrV',v=>{ lr=+v; }, v=>(+v).toFixed(1));
+    document.querySelectorAll('#tsView button').forEach(btn=>btn.addEventListener('click',()=>{
+      document.querySelectorAll('#tsView button').forEach(x=>x.classList.remove('active')); btn.classList.add('active');
+      view=btn.dataset.v; runKmeans(); draw(); updateReadouts(); }));
+    document.querySelectorAll('#tsColor button').forEach(btn=>btn.addEventListener('click',()=>{
+      document.querySelectorAll('#tsColor button').forEach(x=>x.classList.remove('active')); btn.classList.add('active');
+      colorMode=btn.dataset.c; draw(); updateReadouts(); }));
+    document.getElementById('tsToggle').addEventListener('click',function(){
+      running=!running; this.textContent= running?'⏸ עצור':'▶ המשך'; });
+    document.getElementById('tsReset').addEventListener('click',()=>{ resetEmbed(); draw(); updateReadouts(); });
+    document.getElementById('tsNew').addEventListener('click',()=>fullReset());
+  }
+  return { init, draw, step, get running(){return running;} };
+})();
+
+/* ============ tab switching + master loop ============ */
+(function(){
+  const tabs=[].slice.call(document.querySelectorAll('.tab'));
+  const panes=[].slice.call(document.querySelectorAll('.tabpane'));
+  tabs.forEach(t=>t.addEventListener('click',()=>{
+    tabs.forEach(x=>x.classList.remove('active'));
+    panes.forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    const id=t.dataset.tab; document.getElementById(id).classList.add('active');
+    activeTab=id;
+    if(id==='tsne'){ TSNE.init(); TSNE.draw(); }
+    else if(id==='ae'){ AE.draw(); }
+    else if(id==='ano'){ ANO.draw(); }
+  }));
+
+  AE.init();
+  ANO.init();
+  TSNE.init();
+
+  function loop(){
+    try{
+      if(activeTab==='ae' && AE.running) AE.step();
+      else if(activeTab==='tsne' && TSNE.running) TSNE.step();
+    }catch(e){ /* keep loop alive */ }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
